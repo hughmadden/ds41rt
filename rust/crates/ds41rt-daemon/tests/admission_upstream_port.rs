@@ -8,13 +8,13 @@
 //!
 //! # Mapping to ds41rt surfaces
 //!
-//! | upstream invariant                    | ds41rt surface under test |
-//! |---------------------------------------|---------------------------|
+//! | upstream invariant                     | ds41rt surface under test |
+//! |----------------------------------------|---------------------------|
 //! | admission gating / capacity accounting | `ds41rt_core::admit_layerwaves_for_iteration` (the per-iteration scheduler admission used by `commands::scheduler_smoke` and `real_full/scheduler/execution/admission.rs`) |
 //! | queue-full rejection shape (503)       | `ds41rt_api::native_v41` router: bounded mpsc queue `try_send` failure -> HTTP 503, closed-queue health -> 503, worker-side admission failure -> 500 with cause retained |
 //! | delayed admission (min-free-slots)     | sglang policy ported verbatim below as pure functions (`resolve_min_free_slots`, `MinFreeSlotsDelayer::should_delay`) plus a deferred-prefill scheduler simulation against the real `admit_layerwaves_for_iteration` |
 //! | priority under pressure                | `PrefillChunkPolicy::decode_priority` ordering inside `admit_layerwaves_for_iteration` |
-//! | concurrent single-slot admission       | the daemon's own invariant, `v41_requests::Requests::admit` + `v41_native_serve/scheduler.rs` slot loop, modeled here as a pure slot-admission test (the real loop needs CUDA machinery) |
+//! | concurrent single-slot admission       | the daemon's own invariant, modeled after `v41_requests::Requests::admit` ("request slot occupied") + the `v41_native_serve/scheduler.rs` slot loop; the real loop needs CUDA machinery so the occupancy arithmetic is modeled here |
 //!
 //! Not ported (no ds41rt equivalent): vLLM `human_readable_int` CLI notation
 //! and `SchedulerConfig` pydantic validation; vLLM's `max_num_queued_reqs`
@@ -80,14 +80,20 @@ fn mtp_verify(name: &str, token_start: usize, token_count: usize, priority: i32)
     ))
 }
 
+/// A wave carries its request identity on its rows (a wave may merge several
+/// requests' rows after `try_merge`, hence no top-level id field).
+fn wave_id(wave: &LayerWave) -> &str {
+    &wave.row_sources[0].request_id.0
+}
+
 // ---------------------------------------------------------------------------
 // sglang min-free-slots admission-delay policy (verbatim arithmetic port)
 // ---------------------------------------------------------------------------
 
 /// Verbatim port of sglang `min_free_slots_delayer.resolve_min_free_slots`.
-/// `None` = disabled. Explicit user value wins, capped by
-/// `max_running_requests` (`<= 1` disables). Unset + DFlash family falls back
-/// to the legacy formula, disabled for clusters under 8.
+/// `None` = disabled. An explicit user value always wins, capped by
+/// `max_running_requests` (`<= 1` disables). When unset, DFlash workloads fall
+/// back to the legacy formula, disabled for clusters under 8.
 fn resolve_min_free_slots(
     user_value: Option<i64>,
     max_running_requests: i64,
@@ -99,19 +105,9 @@ fn resolve_min_free_slots(
         return (threshold > 1).then_some(threshold);
     }
     if is_dflash_family && max_running_requests >= 8 {
-        return Some((max_running_requests + 5) / 6).clamp(Some(2), Some(4));
+        return Some(((max_running_requests + 5) / 6).clamp(2, 4));
     }
     None
-}
-
-trait ClampOption {
-    fn clamp(self, lo: Option<i64>, hi: Option<i64>) -> Option<i64>;
-}
-
-impl ClampOption for Option<i64> {
-    fn clamp(self, lo: Option<i64>, hi: Option<i64>) -> Option<i64> {
-        self.map(|value| value.clamp(lo.unwrap_or(i64::MIN), hi.unwrap_or(i64::MAX)))
-    }
 }
 
 /// Verbatim port of sglang `MinFreeSlotsDelayer::should_delay`: delay fresh
@@ -131,38 +127,38 @@ mod min_free_slots_delayer {
     use super::{resolve_min_free_slots, MinFreeSlotsDelayer};
 
     #[test]
-    fn unset_non_dflash_disables() {
+    fn admission_unset_non_dflash_disables() {
         assert_eq!(resolve_min_free_slots(None, 512, false), None);
     }
 
     #[test]
-    fn unset_dflash_auto_enables() {
+    fn admission_unset_dflash_auto_enables() {
         assert_eq!(resolve_min_free_slots(None, 512, true), Some(4));
         assert_eq!(resolve_min_free_slots(None, 8, true), Some(2));
     }
 
     #[test]
-    fn unset_dflash_small_cluster_disables() {
+    fn admission_unset_dflash_small_cluster_disables() {
         assert_eq!(resolve_min_free_slots(None, 7, true), None);
         assert_eq!(resolve_min_free_slots(None, 0, true), None);
     }
 
     #[test]
-    fn le_one_disables() {
+    fn admission_le_one_disables() {
         // <= 1 can never batch, so it is a no-op.
         assert_eq!(resolve_min_free_slots(Some(1), 512, false), None);
         assert_eq!(resolve_min_free_slots(Some(0), 512, false), None);
     }
 
     #[test]
-    fn explicit_value_survives_small_cluster() {
+    fn admission_explicit_value_survives_small_cluster() {
         // The < 8 guard belongs to the DFlash auto-default, not explicit values.
         assert_eq!(resolve_min_free_slots(Some(4), 7, false), Some(4));
         assert_eq!(resolve_min_free_slots(Some(4), 7, true), Some(4));
     }
 
     #[test]
-    fn non_dflash_uses_explicit_value() {
+    fn admission_non_dflash_uses_explicit_value() {
         assert_eq!(resolve_min_free_slots(Some(2), 8, false), Some(2));
         assert_eq!(resolve_min_free_slots(Some(3), 512, false), Some(3));
         assert_eq!(resolve_min_free_slots(Some(8), 512, false), Some(8));
@@ -170,36 +166,36 @@ mod min_free_slots_delayer {
     }
 
     #[test]
-    fn explicit_value_is_capped_to_max_running_requests() {
+    fn admission_explicit_value_is_capped_to_max_running_requests() {
         assert_eq!(resolve_min_free_slots(Some(16), 8, false), Some(8));
     }
 
     #[test]
-    fn user_value_overrides_dflash_default() {
+    fn admission_user_value_overrides_dflash_default() {
         assert_eq!(resolve_min_free_slots(Some(3), 512, true), Some(3));
         assert_eq!(resolve_min_free_slots(Some(16), 512, true), Some(16));
     }
 
     #[test]
-    fn explicit_one_disables_dflash_default() {
+    fn admission_explicit_one_disables_dflash_default() {
         assert_eq!(resolve_min_free_slots(Some(1), 512, true), None);
     }
 
     #[test]
-    fn delayer_delays_below_threshold() {
+    fn admission_delayer_delays_below_threshold() {
         let delayer = MinFreeSlotsDelayer { min_free_slots: 4 };
         assert!(delayer.should_delay(100, 2));
     }
 
     #[test]
-    fn delayer_no_delay_at_or_above_threshold() {
+    fn admission_delayer_no_delay_at_or_above_threshold() {
         let delayer = MinFreeSlotsDelayer { min_free_slots: 4 };
         assert!(!delayer.should_delay(100, 4));
         assert!(!delayer.should_delay(100, 8));
     }
 
     #[test]
-    fn delayer_no_delay_when_idle() {
+    fn admission_delayer_no_delay_when_idle() {
         // Nothing running: no decode batch to protect, prefill at once.
         let delayer = MinFreeSlotsDelayer { min_free_slots: 4 };
         assert!(!delayer.should_delay(0, 0));
@@ -257,13 +253,11 @@ mod admission_gating {
         // Token budget alone is not enough: the active-chunk count gate
         // defers the third chunk (vLLM: independent limit checks).
         let policy = policy(1024, 2, true);
-        let admission = admit_layerwaves_for_iteration(
-            vec![prefill("p0", 0, 16, 0), prefill("p1", 16, 16, 1), prefill("p2", 32, 16, 2)],
-            &policy,
-        );
+        let waves = vec![prefill("p0", 0, 16, 0), prefill("p1", 16, 16, 1), prefill("p2", 32, 16, 2)];
+        let admission = admit_layerwaves_for_iteration(waves.clone(), &policy);
         assert_eq!(admission.selected_prefill_chunks, 2);
         assert_eq!(admission.deferred.len(), 1);
-        assert_eq!(admission.deferred[0].request_id, prefill("p2", 32, 16, 2).request_id);
+        assert_eq!(wave_id(&admission.deferred[0]), wave_id(&waves[2]));
     }
 
     #[test]
@@ -308,18 +302,18 @@ mod admission_gating {
     fn admission_token_and_chunk_limits_checked_independently() {
         // vLLM: test_admission_both_limits_checked_independently — either
         // limit alone can defer. Here the token budget is exhausted first.
-        let policy = policy(16, 4, true);
+        let token_policy = policy(16, 4, true);
         let admission = admit_layerwaves_for_iteration(
             vec![prefill("p0", 0, 16, 0), prefill("p1", 16, 16, 1)],
-            &policy,
+            &token_policy,
         );
         assert_eq!(admission.selected_prefill_rows, 16);
         assert_eq!(admission.deferred.len(), 1);
         // And with tokens available but chunks exhausted, deferral also fires.
-        let policy = policy(1024, 1, true);
+        let chunk_policy = policy(1024, 1, true);
         let admission = admit_layerwaves_for_iteration(
             vec![prefill("p0", 0, 16, 0), prefill("p1", 16, 16, 1)],
-            &policy,
+            &chunk_policy,
         );
         assert_eq!(admission.selected_prefill_chunks, 1);
         assert_eq!(admission.deferred.len(), 1);
@@ -336,23 +330,24 @@ mod admission_gating {
             decode("d0", 9, 0),
             mtp_verify("m0", 11, 4, 0),
         ];
-        let expected_prefill: usize =
-            waves.iter().filter(|wave| wave.mode == LayerWaveMode::Prefill).map(LayerWave::num_rows).sum();
-        let expected_decode: usize =
-            waves.iter().filter(|wave| wave.mode == LayerWaveMode::Decode).map(LayerWave::num_rows).sum();
-        let expected_mtp: usize = waves
-            .iter()
-            .filter(|wave| wave.mode == LayerWaveMode::MtpVerify)
-            .map(LayerWave::num_rows)
-            .sum();
-        let admission = admit_layerwaves_for_iteration(waves, &policy);
-        assert_eq!(admission.selected_prefill_rows, expected_prefill);
-        assert_eq!(admission.selected_decode_rows, expected_decode);
-        assert_eq!(admission.selected_mtp_rows, expected_mtp);
-        assert_eq!(
-            admission.selected.len(),
-            admission.selected_prefill_chunks + 1 + 1
+        let rows_of = |mode: LayerWaveMode| {
+            waves
+                .iter()
+                .filter(|wave| wave.mode == mode)
+                .map(LayerWave::num_rows)
+                .sum::<usize>()
+        };
+        let (prefill_rows, decode_rows, mtp_rows) = (
+            rows_of(LayerWaveMode::Prefill),
+            rows_of(LayerWaveMode::Decode),
+            rows_of(LayerWaveMode::MtpVerify),
         );
+        let admission = admit_layerwaves_for_iteration(waves, &policy);
+        assert_eq!(admission.selected_prefill_rows, prefill_rows);
+        assert_eq!(admission.selected_decode_rows, decode_rows);
+        assert_eq!(admission.selected_mtp_rows, mtp_rows);
+        assert_eq!(admission.selected.len(), 4);
+        assert_eq!(admission.selected_prefill_chunks, 2);
     }
 
     #[test]
@@ -367,8 +362,7 @@ mod admission_gating {
             &policy,
         );
         assert_eq!(admission.selected.len(), 2);
-        let admission =
-            admit_layerwaves_for_iteration(vec![prefill("p0", 0, 513, 0)], &policy);
+        let admission = admit_layerwaves_for_iteration(vec![prefill("p0", 0, 513, 0)], &policy);
         assert_eq!(admission.deferred.len(), 1);
     }
 }
@@ -383,7 +377,7 @@ mod admission_priority {
     #[test]
     fn admission_decode_priority_selects_decode_before_prefill_regardless_of_priority_value() {
         // decode_priority=true: mode rank dominates the numeric priority, so
-        // a low-priority decode still leads the iteration.
+        // a low-priority-number decode still leads the iteration.
         let policy = policy(1024, 8, true);
         let admission = admit_layerwaves_for_iteration(
             vec![prefill("p0", 0, 16, 0), decode("d0", 10, 99)],
@@ -397,11 +391,7 @@ mod admission_priority {
     fn admission_mode_order_is_decode_then_mtp_then_prefill() {
         let policy = policy(1024, 8, true);
         let admission = admit_layerwaves_for_iteration(
-            vec![
-                prefill("p0", 0, 16, 0),
-                mtp_verify("m0", 4, 2, 50),
-                decode("d0", 10, 99),
-            ],
+            vec![prefill("p0", 0, 16, 0), mtp_verify("m0", 4, 2, 50), decode("d0", 10, 99)],
             &policy,
         );
         let modes: Vec<_> = admission.selected.iter().map(|wave| wave.mode).collect();
@@ -417,10 +407,15 @@ mod admission_priority {
         // priorities preserve arrival order (stable index tiebreak).
         let policy = policy(1024, 8, true);
         let admission = admit_layerwaves_for_iteration(
-            vec![prefill("late-low", 0, 8, 5), prefill("early-high", 8, 8, 1), prefill("tie-a", 16, 8, 5), prefill("tie-b", 24, 8, 5)],
+            vec![
+                prefill("late-low", 0, 8, 5),
+                prefill("early-high", 8, 8, 1),
+                prefill("tie-a", 16, 8, 5),
+                prefill("tie-b", 24, 8, 5),
+            ],
             &policy,
         );
-        let ids: Vec<_> = admission.selected.iter().map(|wave| wave.request_id.to_string()).collect();
+        let ids: Vec<_> = admission.selected.iter().map(wave_id).collect();
         assert_eq!(ids, vec!["early-high", "late-low", "tie-a", "tie-b"]);
     }
 
@@ -449,7 +444,7 @@ mod admission_priority {
         );
         assert_eq!(first.selected.len(), 1);
         assert_eq!(first.deferred.len(), 2);
-        let deferred_ids: Vec<_> = first.deferred.iter().map(|wave| wave.request_id.to_string()).collect();
+        let deferred_ids: Vec<_> = first.deferred.iter().map(wave_id).collect();
         assert_eq!(deferred_ids, vec!["p1", "p2"]);
         // Next iteration sees the deferred waves plus fresh decode work;
         // decode leads and exactly one deferred prefill fits the freed slot.
@@ -460,7 +455,7 @@ mod admission_priority {
         assert_eq!(second.selected.len(), 2);
         assert_eq!(second.selected_prefill_rows, 16);
         assert_eq!(second.deferred.len(), 1);
-        assert_eq!(second.deferred[0].request_id.to_string(), "p2");
+        assert_eq!(wave_id(&second.deferred[0]), "p2");
     }
 
     #[test]
@@ -481,8 +476,9 @@ mod admission_priority {
 mod delayed_admission {
     use super::*;
 
-    /// One scheduler round: admit from the pending queues, return the
-    /// admitted wave ids. Models the daemon's `scheduler_smoke` loop.
+    /// One scheduler round: admit from the pending queues. Models the daemon's
+    /// `commands::scheduler_smoke` loop (pending queues -> candidates ->
+    /// admission -> retire selected / requeue deferred).
     fn round(
         policy: &PrefillChunkPolicy,
         pending_decodes: &mut Vec<LayerWave>,
@@ -495,19 +491,17 @@ mod delayed_admission {
             .chain(pending_prefill.iter().cloned())
             .collect::<Vec<_>>();
         let admission = admit_layerwaves_for_iteration(candidates, policy);
-        for wave in admission.selected {
-            let id = wave.request_id.to_string();
-            admitted_log.push(id.clone());
-            if let Some(index) = pending_decodes.iter().position(|pending| pending.request_id == wave.request_id) {
-                pending_decodes.remove(index);
-            } else if let Some(index) =
-                pending_prefill.iter().position(|pending| pending.request_id == wave.request_id)
-            {
-                pending_prefill.remove(index);
-            } else {
-                panic!("admitted wave {id} was not pending");
-            }
+        let mut removed = std::collections::HashSet::new();
+        for wave in &admission.selected {
+            admitted_log.push(wave_id(wave).to_owned());
+            removed.insert(wave_id(wave).to_owned());
         }
+        for wave in &admission.deferred {
+            removed.insert(wave_id(wave).to_owned());
+        }
+        pending_decodes.retain(|pending| !removed.contains(wave_id(pending)));
+        pending_prefill.retain(|pending| !removed.contains(wave_id(pending)));
+        // Deferred waves stay at the head of the prefill queue in order.
         let mut requeue = admission.deferred;
         requeue.extend(pending_prefill.drain(..));
         *pending_prefill = requeue;
@@ -520,7 +514,9 @@ mod delayed_admission {
         // matter how deep the prefill backlog is (sglang's delayer protects
         // the same invariant by delaying prefill, never decode).
         let policy = policy(16, 1, true);
-        let mut pending_prefill = (0..8).map(|index| prefill(&format!("p{index}"), index * 16, 16, index as i32)).collect::<Vec<_>>();
+        let mut pending_prefill = (0..8)
+            .map(|index| prefill(&format!("p{index}"), index * 16, 16, index as i32))
+            .collect::<Vec<_>>();
         let mut pending_decodes = Vec::new();
         let mut admitted = Vec::new();
         // Saturate several rounds with prefill only.
@@ -530,43 +526,56 @@ mod delayed_admission {
         assert!(pending_prefill.len() < 8);
         // A decode arrives mid-backlog.
         pending_decodes.push(decode("d0", 999, 0));
+        let admitted_before = admitted.len();
         round(&policy, &mut pending_decodes, &mut pending_prefill, &mut admitted);
         assert!(pending_decodes.is_empty(), "decode was delayed behind prefill backlog");
-        assert_eq!(admitted.last().map(String::as_str), Some("d0"));
+        // Decode priority puts the decode first in this round's selection.
+        assert_eq!(
+            admitted[admitted_before..].first().map(String::as_str),
+            Some("d0"),
+            "decode did not lead its admission round"
+        );
         // The prefill backlog still makes progress and loses nothing.
         let total_prefill = 8;
         let remaining = pending_prefill.len();
-        assert_eq!(admitted.iter().filter(|id| id.starts_with('p')).count() + remaining, total_prefill);
+        assert_eq!(
+            admitted.iter().filter(|id| id.starts_with('p')).count() + remaining,
+            total_prefill
+        );
     }
 
     #[test]
-    fn admission_prefill_is_deferred_only_while_slots_free_up() {
-        // MinFreeSlotsDelayer-shaped policy: while a decode batch is running
-        // and free slots are below the threshold, fresh prefill waits; once
-        // slots free up, the whole deferred batch admits at once (batching
-        // into one admission instead of one at a time).
+    fn admission_prefill_defers_then_batches_into_one_admission() {
+        // MinFreeSlotsDelayer-shaped policy: deferred prefill waits and then
+        // admits as one batch once capacity frees, rather than trickling.
         let policy = policy(64, 4, true);
-        let mut pending_prefill = vec![prefill("p0", 0, 8, 0), prefill("p1", 8, 8, 1)];
+        // Round 1: decode leads; both small prefill chunks fit alongside.
+        let mut pending_prefill =
+            vec![prefill("p0", 0, 8, 0), prefill("p1", 8, 8, 1)];
         let mut pending_decodes = vec![decode("d0", 0, 0)];
         let mut admitted = Vec::new();
-        // Round 1: decode leads; prefill still fits alongside (64-token
-        // budget, 4 chunks), so everything admits.
         round(&policy, &mut pending_decodes, &mut pending_prefill, &mut admitted);
         assert!(pending_prefill.is_empty());
         assert!(pending_decodes.is_empty());
-        // Now overload the budget with a large prefill wave and a decode:
-        // the wave defers, decode still lands.
+        // Round 2: a large prefill wave exceeds the budget and defers while
+        // the decode still lands.
         let mut pending_prefill = vec![prefill("big", 0, 128, 0)];
         let mut pending_decodes = vec![decode("d1", 1, 0)];
-        let mut admitted = Vec::new();
         round(&policy, &mut pending_decodes, &mut pending_prefill, &mut admitted);
         assert!(pending_decodes.is_empty());
         assert_eq!(pending_prefill.len(), 1);
-        // Decode finishes (dropped from pending); the deferred wave now fits
-        // the whole budget by itself and admits in one shot.
+        // Round 3: decode finished; the 128-row wave can never fit the
+        // 64-token budget. Replanned as two 32-row chunks (64 rows total)
+        // the deferred work clears in ONE round — batched into a single
+        // admission rather than trickling one chunk per round (the sglang
+        // delayer's batching shape).
+        let mut pending_prefill = vec![prefill("big-a", 0, 32, 0), prefill("big-b", 32, 32, 1)];
         round(&policy, &mut Vec::new(), &mut pending_prefill, &mut admitted);
         assert!(pending_prefill.is_empty());
-        assert_eq!(admitted.last().map(String::as_str), Some("big"));
+        assert_eq!(
+            admitted[admitted.len() - 2..],
+            ["big-a".to_owned(), "big-b".to_owned()]
+        );
     }
 
     #[test]
@@ -585,37 +594,49 @@ mod delayed_admission {
 
 // ---------------------------------------------------------------------------
 // Slot admission model: the daemon scheduler's concurrency invariant
-// (v41_native_serve/scheduler.rs slot loop + v41_requests::Requests::admit
-// occupancy check), modeled without CUDA machinery. Maps vLLM
+// (v41_requests::Requests::admit occupancy check + v41_native_serve/scheduler.rs
+// slot loop), modeled without CUDA machinery. Maps vLLM
 // test_concurrent_single_request_admission_respects_limit.
 // ---------------------------------------------------------------------------
 
 mod slot_admission {
-    /// Model of the daemon scheduler's fixed-slot admission table
-    /// (`active: Vec<Option<Active>>` sized by `args.concurrency`).
+    /// Model of the daemon's fixed-slot admission table: `active:
+    /// Vec<Option<Active>>` sized by `args.concurrency` in
+    /// `v41_native_serve/scheduler.rs`, each occupancy an admitted
+    /// `Requests::admit(slot, id)` lease.
     #[derive(Default)]
     struct SlotTable {
         occupants: Vec<Option<u64>>,
     }
 
     impl SlotTable {
-        /// `v41_native_serve/scheduler.rs`: `active.iter().position(Option::is_none)`
-        /// followed by `requests.admit(slot, id)`, which rejects an occupied
-        /// slot ("request slot occupied").
-        fn try_admit(&mut self, concurrency: usize, id: u64) -> Result<usize, &'static str> {
-            if self.occupants.len() < concurrency {
-                self.occupants.resize(concurrency, None);
+        fn with_capacity(concurrency: usize) -> Self {
+            Self {
+                occupants: (0..concurrency).map(|_| None).collect(),
             }
-            let slot = self
-                .occupants
-                .iter()
-                .position(Option::is_none)
-                .ok_or("all request slots occupied")?;
-            if self.occupants[slot].is_some() {
+        }
+
+        /// The scheduler loop's free-slot probe:
+        /// `active.iter().position(Option::is_none)`.
+        fn first_free(&self) -> Option<usize> {
+            self.occupants.iter().position(Option::is_none)
+        }
+
+        /// `Requests::admit(slot, id)` from `v41_requests.rs`: the slot must
+        /// be in range and unoccupied, else "request slot occupied".
+        fn admit(&mut self, slot: usize, id: u64) -> Result<usize, &'static str> {
+            if slot >= self.occupants.len() || self.occupants[slot].is_some() {
                 return Err("request slot occupied");
             }
             self.occupants[slot] = Some(id);
             Ok(slot)
+        }
+
+        /// Scheduler-loop admission: find a free slot or report the
+        /// queue-full shape the API surfaces as HTTP 503.
+        fn try_admit(&mut self, id: u64) -> Result<usize, &'static str> {
+            let slot = self.first_free().ok_or("all request slots occupied")?;
+            self.admit(slot, id)
         }
 
         fn release(&mut self, id: u64) -> bool {
@@ -629,102 +650,55 @@ mod slot_admission {
     }
 
     #[test]
-    fn admission_slot_table_rejects_at_capacity() {
-        let mut table = SlotTable::default();
-        assert_eq!(table.try_admit(2, 1), Ok(0));
-        assert_eq!(table.try_admit(2, 2), Ok(1));
-        assert_eq!(table.try_admit(2, 3), Err("all request slots occupied"));
-        // A release frees exactly one slot (queue-full is transient, the
-        // next arrival admits — the try-again shape).
+    fn admission_slot_table_rejects_at_capacity_and_recovers_on_release() {
+        let mut table = SlotTable::with_capacity(2);
+        assert_eq!(table.try_admit(1), Ok(0));
+        assert_eq!(table.try_admit(2), Ok(1));
+        assert_eq!(table.try_admit(3), Err("all request slots occupied"));
+        // A release frees exactly one slot: queue-full is transient, the next
+        // arrival admits — the try-again shape mapped to HTTP 503 upstream.
         assert!(table.release(1));
-        assert_eq!(table.try_admit(2, 3), Ok(0));
+        assert_eq!(table.try_admit(3), Ok(0));
+        assert!(!table.release(1), "released slot is gone");
     }
 
     #[test]
-    fn admission_slot_table_double_admit_same_slot_rejected() {
-        // Mirrors `Requests::admit`'s "request slot occupied" guard.
-        let mut table = SlotTable::default();
-        table.try_admit(4, 7).unwrap();
-        // Simulate a stale scheduler iteration reusing a live slot.
-        table.occupants[0] = Some(7);
-        assert_eq!(table.try_admit(4, 8), Ok(1));
+    fn admission_slot_table_rejects_occupied_and_out_of_range_slots() {
+        // Mirrors `Requests::admit`'s guard: a stale scheduler iteration must
+        // not re-admit a live slot, nor address beyond the table.
+        let mut table = SlotTable::with_capacity(2);
+        table.admit(0, 7).unwrap();
+        assert_eq!(table.admit(0, 8), Err("request slot occupied"));
+        assert_eq!(table.admit(2, 8), Err("request slot occupied"));
+        assert_eq!(table.admit(usize::MAX, 8), Err("request slot occupied"));
+        assert_eq!(table.try_admit(8), Ok(1));
     }
 
     #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
     async fn admission_concurrent_single_slot_admission_respects_limit() {
         // vLLM: test_concurrent_single_request_admission_respects_limit.
-        // The daemon serializes admission on the scheduler thread; the
-        // invariant is that two concurrent contenders for one free slot
-        // cannot both win. The model serializes check-and-occupy on a mutex
-        // exactly as the single scheduler loop does.
-        let table = std::sync::Arc::new(std::sync::Mutex::new(SlotTable::default()));
-        let results = futures_like_join(
-            (0..2).map(|contender| {
-                let table = table.clone();
-                async move {
-                    // Yield once between check and occupy to expose a race if
-                    // serialization were missing.
-                    tokio::task::yield_now().await;
-                    table.lock().unwrap().try_admit(1, contender)
-                }
-            })
-            .collect(),
-        )
-        .await;
-        let admitted = results.iter().filter(|result| result.is_ok()).count();
-        let rejected = results.iter().filter(|result| result.is_err()).count();
-        assert_eq!(admitted, 1);
-        assert_eq!(rejected, 1);
-        let table = table.lock().unwrap();
-        assert_eq!(table.occupants.iter().flatten().count(), 1);
-    }
-
-    /// Minimal join (avoids pulling a futures dev-dependency into the crate).
-    async fn futures_like_join<F: std::future::Future<Output = R>, R>(
-        futures: Vec<F>,
-    ) -> Vec<R> {
-        let mut futures = futures.into_iter().map(Box::pin).collect::<Vec<_>>();
-        let mut outputs = Vec::with_capacity(futures.len());
-        while !futures.is_empty() {
-            let mut index = 0;
-            while index < futures.len() {
-                let mut future = futures[index].as_mut();
-                if let std::task::Poll::Ready(output) =
-                    futures_like_poll_fn(&mut future)
-                {
-                    outputs.push(output);
-                    futures.remove(index);
-                } else {
-                    index += 1;
-                }
-            }
-            if !futures.is_empty() {
+        // The daemon serializes admission on its single scheduler thread
+        // (check-and-occupy happen together in the recv loop); the invariant
+        // is that two concurrent contenders for one free slot cannot both
+        // win. The model serializes check-and-occupy on a mutex, with a yield
+        // between contenders to expose a race if serialization were missing.
+        let table = std::sync::Arc::new(std::sync::Mutex::new(SlotTable::with_capacity(1)));
+        let contender = |id: u64| {
+            let table = table.clone();
+            async move {
                 tokio::task::yield_now().await;
+                table.lock().unwrap().try_admit(id)
             }
-        }
-        outputs
-    }
-
-    fn futures_like_poll_fn<F: std::future::Future>(
-        future: &mut std::pin::Pin<&mut F>,
-    ) -> std::task::Poll<F::Output> {
-        use std::sync::{Arc, Mutex};
-        use std::task::{Context, Poll, RawWaker, RawWakerVTable, Waker};
-        // A no-op waker: this hand-rolled join only polls futures that were
-        // made ready by the preceding yield, which is all this test needs.
-        fn raw_waker() -> RawWaker {
-            fn clone(_: *const ()) -> RawWaker {
-                raw_waker()
-            }
-            fn wake(_: *const ()) {}
-            fn wake_by_ref(_: *const ()) {}
-            fn drop(_: *const ()) {}
-            RawWaker::new(std::ptr::null(), &RawWakerVTable::new(clone, wake, wake_by_ref, drop))
-        }
-        let _arc_mutex_anchor: Arc<Mutex<()>> = Arc::new(Mutex::new(()));
-        let waker = unsafe { Waker::from_raw(raw_waker()) };
-        let mut context = Context::from_waker(&waker);
-        future.as_mut().poll(&mut context)
+        };
+        let (first, second) = tokio::join!(contender(0), contender(1));
+        let results = [first, second];
+        assert_eq!(results.iter().filter(|result| result.is_ok()).count(), 1);
+        assert_eq!(results.iter().filter(|result| result.is_err()).count(), 1);
+        assert_eq!(
+            table.lock().unwrap().occupants.iter().flatten().count(),
+            1,
+            "exactly one request occupies the single slot"
+        );
     }
 }
 
@@ -746,8 +720,8 @@ mod http_503_mapping {
         )
     }
 
-    /// Minimal HTTP/1.1 client over a raw tokio socket (no reqwest in this
-    /// crate's dependency set). Sends `Connection: close` and reads the
+    /// Minimal HTTP/1.1 client over a raw tokio socket (no HTTP client in
+    /// this crate's dependency set). Sends `Connection: close` and reads the
     /// response to EOF.
     async fn http_request(addr: SocketAddr, method: &str, path: &str, body: &str) -> (u16, String) {
         use tokio::io::{AsyncReadExt, AsyncWriteExt};
@@ -798,37 +772,12 @@ mod http_503_mapping {
         for _ in 0..2 {
             queue.try_send(dummy_job()).unwrap();
         }
-        let router = native_v41::router_with_limits(
-            queue,
-            native_v41::NativeLimits::default(),
-        );
+        let router = native_v41::router_with_limits(queue, native_v41::NativeLimits::default());
         let addr = serve(router).await;
-        let (status, response) = http_request(addr, "POST", "/v1/chat/completions", &chat_body(1)).await;
+        let (status, response) =
+            http_request(addr, "POST", "/v1/chat/completions", &chat_body(1)).await;
         assert_eq!(status, 503, "{response}");
-        assert!(response.contains("error"), "{response}");
-    }
-
-    #[tokio::test]
-    async fn admission_queue_with_capacity_accepts_and_waits_for_worker() {
-        // Sanity counterpart: with queue capacity the request is admitted and
-        // the handler then awaits the worker's first chunk (which never
-        // arrives here), so the connection stays open rather than 503.
-        let (queue, mut receive) = tokio::sync::mpsc::channel::<native_v41::NativeRequest>(2);
-        let worker = tokio::spawn(async move {
-            // Hold admitted jobs without responding.
-            let _held = receive.recv().await;
-            std::future::pending::<()>().await;
-        });
-        let router = native_v41::router_with_limits(
-            queue,
-            native_v41::NativeLimits::default(),
-        );
-        let addr = serve(router).await;
-        // A bounded-capacity admit probe: filling to capacity still leaves
-        // try_send succeeding for exactly the spare slots.
-        let (status, _) = http_request(addr, "GET", "/health", "").await;
-        assert_eq!(status, 200);
-        worker.abort();
+        assert!(response.contains("\"error\""), "{response}");
     }
 
     #[tokio::test]
@@ -845,14 +794,26 @@ mod http_503_mapping {
     }
 
     #[tokio::test]
+    async fn admission_open_queue_health_maps_to_200() {
+        let (queue, _receive) = tokio::sync::mpsc::channel::<native_v41::NativeRequest>(1);
+        let router = native_v41::router(queue);
+        let addr = serve(router).await;
+        let (status, _) = http_request(addr, "GET", "/health", "").await;
+        assert_eq!(status, 200);
+    }
+
+    #[tokio::test]
     async fn admission_worker_failure_maps_to_500_with_cause() {
         // The daemon's scheduler-side admission failure (e.g. pool exhausted
         // during preparation) reaches the client as a 500 carrying the cause,
-        // not a fabricated success — the comment in native_v41.rs pins this.
+        // not a fabricated success — pinned by the comment in native_v41.rs.
         let (queue, mut receive) = tokio::sync::mpsc::channel::<native_v41::NativeRequest>(4);
         let worker = tokio::spawn(async move {
             while let Some(job) = receive.recv().await {
-                let _ = job.events.send(Err(native_v41::NativeFailure::from("pool exhausted"))).await;
+                let _ = job
+                    .events
+                    .send(Err(native_v41::NativeFailure::from("pool exhausted")))
+                    .await;
             }
         });
         let router = native_v41::router(queue);
