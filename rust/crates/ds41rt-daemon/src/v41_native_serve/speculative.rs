@@ -524,9 +524,9 @@ impl<'w, 'a, C: DraftChain<'a>> DraftRuntime<'w, 'a, C> {
 
 impl<'a> DraftPrefix<'a> {
     pub fn parts(&self) -> &[crate::v41_dspark_cache::DsparkPrefix<'a>] {
-        &self.windows
+        self.windows.get().as_slice()
     }
-    pub fn from_parts(windows: Vec<crate::v41_dspark_cache::DsparkPrefix<'a>>) -> Self {
+    pub fn from_parts(windows: crate::v41_memory::device::DeviceOwner<'a, Vec<crate::v41_dspark_cache::DsparkPrefix<'a>>>) -> Self {
         Self { windows }
     }
 }

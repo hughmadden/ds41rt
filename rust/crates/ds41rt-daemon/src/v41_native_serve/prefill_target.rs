@@ -36,6 +36,22 @@ pub(crate) trait PrefillTarget<'a>: VerificationTarget<'a> + Sized {
         chunks: &[&[u32]], transports: [&mut Self::Transport; 2], suffix: &mut Self::Suffix,
         keep_running: &dyn Fn() -> bool) -> Result<()>;
     /// # Safety
+    /// Same contract as `encoder_stream`, plus: `before_chunk` runs synchronously
+    /// before each dispatched chunk (host-cache store pacing, packet HC-9).
+    async unsafe fn execute_encoder_stream_held(&mut self, other: &mut Self, requests: &mut Requests<'a>,
+        lease: CacheLease, chunks: &[&[u32]], transports: [&mut Self::Transport; 2],
+        suffix: &mut Self::Suffix, keep_running: &dyn Fn() -> bool,
+        before_chunk: &dyn Fn() -> Result<()>) -> Result<()> {
+        // Default for passes without a held dispatch (dual-RTX lane): the hold is
+        // load-bearing on the single-GPU 5090 path only; log once so degradation
+        // is observable rather than silent (rc2 lesson).
+        static LOGGED: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+        if !LOGGED.swap(true, std::sync::atomic::Ordering::Relaxed) {
+            tracing::warn!("held encoder stream unavailable on this pass; HC-9 per-chunk hold inactive");
+        }
+        self.encoder_stream(other, requests, lease, chunks, transports, suffix, keep_running).await
+    }
+    /// # Safety
     /// Batch inputs and optional completed encoder suffix match this target.
     async unsafe fn prefill_logits(&mut self, lib: &'a NativeLibrary, requests: &mut Requests<'a>,
         batch: &mut RequestBatch, transport: &mut Self::Transport, selected: &[usize],
@@ -58,6 +74,13 @@ impl<'a> PrefillTarget<'a> for TargetPass<'_, 'a> {
         chunks: &[&[u32]], transports: [&mut Self::Transport; 2], suffix: &mut Self::Suffix,
         keep_running: &dyn Fn() -> bool) -> Result<()> {
         unsafe { self.execute_encoder_stream(other, requests, lease, chunks, transports, suffix, keep_running).await }
+    }
+    async unsafe fn execute_encoder_stream_held(&mut self, other: &mut Self, requests: &mut Requests<'a>,
+        lease: CacheLease, chunks: &[&[u32]], transports: [&mut Self::Transport; 2],
+        suffix: &mut Self::Suffix, keep_running: &dyn Fn() -> bool,
+        before_chunk: &dyn Fn() -> Result<()>) -> Result<()> {
+        unsafe { self.execute_encoder_stream_held(other, requests, lease, chunks, transports, suffix,
+            keep_running, before_chunk).await }
     }
     async unsafe fn prefill_logits(&mut self, lib: &'a NativeLibrary, requests: &mut Requests<'a>,
         batch: &mut RequestBatch, transport: &mut Self::Transport, selected: &[usize],

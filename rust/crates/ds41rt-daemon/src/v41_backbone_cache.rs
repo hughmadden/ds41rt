@@ -923,7 +923,7 @@ impl<'a> BackboneCache<'a> {
     pub fn prefix_library(&self) -> &'a NativeLibrary {
         self.prefix_stream.library
     }
-    pub fn sources(&self) -> &[CompressorState<'a>] {
-        &self.sources
+    pub fn sources(&self) -> impl Iterator<Item = &CompressorState<'a>> {
+        self.sources.iter().map(|owner| owner.get())
     }
 }

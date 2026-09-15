@@ -116,12 +116,12 @@ impl<'a> PrefixCache<'a> {
     /// restore finds it. The snapshot needs device pages exactly as a prefill of the same tokens
     /// would, so room is made the same way first: the oldest retained device snapshots are
     /// evicted (through the host cache) until the pool can take it.
-    fn host_restore(
+    fn host_restore<C: speculative::DraftChain<'a>>(
         &mut self,
         keys: &[u32],
         lease: CacheLease,
         requests: &Requests<'a>,
-        draft: Option<&DraftRuntime<'_, 'a>>,
+        draft: Option<&DraftRuntime<'_, 'a, C>>,
     ) -> Result<()> {
         let Some(host) = &mut self.host else {
             return Ok(());

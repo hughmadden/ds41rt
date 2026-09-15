@@ -254,8 +254,9 @@ pub(super) fn worker(args: crate::cli::NativeServeArgs, mut receive: mpsc::Recei
     tracing::info!(elapsed_ms=started.elapsed().as_millis(), "dual RTX serving owners ready");
     ready.take().context("startup readiness missing")?.send(Ok(()))
         .map_err(|_| anyhow::anyhow!("API startup cancelled"))?;
+    let stats = std::sync::Arc::new(std::sync::Mutex::new(serde_json::Value::Null));
     scheduler::serve(&lib, &args, &runtime, &mut receive, &mut pass, &mut second, &mut requests,
-        &mut transport, &mut second_transport, draft.as_mut().map(|d| d.get_mut()), &mut vision)
+        &mut transport, &mut second_transport, draft.as_mut().map(|d| d.get_mut()), &mut vision, stats)
 }
 
 
