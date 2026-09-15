@@ -140,7 +140,7 @@ pub(super) fn serve<'w, 'a, P: ServingTarget<'w, 'a>>(lib: &'a NativeLibrary, ar
     let mut compiler = super::constraints::Compiler::new(lib, args.snapshot.join("tokenizer.json"));
     let mut id = 0u64;
     let mut closed = false;
-    let template = requests.cache().sources()[0].source_cache().page_segments(0)[0];
+    let template = requests.cache().sources()[0].get().source_cache().page_segments(0)[0];
     let host_cache = super::prefix::HostCacheBinding::new(lib, args.host_cache_config()?, template)?;
     let mut prefixes = PrefixCache::new(args.prefix_cache_entries as usize).with_host_cache(host_cache);
     let mut stats_published = Instant::now();

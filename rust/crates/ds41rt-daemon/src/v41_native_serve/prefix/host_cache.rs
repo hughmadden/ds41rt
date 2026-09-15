@@ -399,7 +399,7 @@ impl<'a> HostCacheBinding<'a> {
         let mut source_parts = Vec::with_capacity(COMPRESSORS);
         for (c, prefix) in sources.iter().enumerate() {
             let (source_owner, source_end, source) = prefix.parts();
-            let cache = caches[c].source_cache();
+            let cache = caches[c].get().source_cache();
             pages[c] = source
                 .pages()
                 .iter()
@@ -501,11 +501,11 @@ impl<'a> HostCacheBinding<'a> {
     }
     /// Rebuild a `Saved` from the host copy. `Ok(None)` when the restore timed out or failed (the
     /// caller prefills); allocations are released only after the restore stream drained.
-    pub(super) fn restore(
+    pub(super) fn restore<C: crate::v41_native_serve::speculative::DraftChain<'a>>(
         &mut self,
         hit: &Hit,
         requests: &Requests<'a>,
-        draft: Option<&DraftRuntime<'_, 'a>>,
+        draft: Option<&DraftRuntime<'_, 'a, C>>,
     ) -> Result<Option<Saved<'a>>> {
         // Take what the rebuilt `Saved` needs out of the payload before the mutable restore call.
         let (owner, end, windows, source_parts, draft_parts, history, next, images) = {
@@ -533,7 +533,7 @@ impl<'a> HostCacheBinding<'a> {
         let mut sources = Vec::with_capacity(COMPRESSORS);
         let mut pages: [Vec<DevicePage>; COMPRESSORS] = Default::default();
         for (c, &(owner, end, count, rows)) in source_parts.iter().enumerate() {
-            let cache = caches[c].source_cache();
+            let cache = caches[c].get().source_cache();
             let source = cache.allocate_prefix(count, rows)?;
             pages[c] = source
                 .pages()
@@ -591,13 +591,13 @@ impl<'a> HostCacheBinding<'a> {
             history,
         );
         let draft = match (draft_parts.as_ref(), rings) {
-            (Some(parts), Some(rings)) => Some(DraftPrefix::from_parts(
+            (Some(parts), Some(rings)) => Some(DraftPrefix::from_parts(&caches[0].device,
                 parts
                     .iter()
                     .zip(rings)
                     .map(|(&(o, e, _), ring)| DsparkPrefix::from_parts(o, e, ring))
                     .collect(),
-            )),
+            )?),
             _ => None,
         };
         Ok(Some(Saved {
