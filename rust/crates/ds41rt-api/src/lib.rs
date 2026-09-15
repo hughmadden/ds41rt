@@ -182,7 +182,7 @@ fn completion_error_response(err: ApiError) -> Response {
         "chat_completions_error status={} code={} message={}",
         err.status,
         err.code.as_deref().unwrap_or("unknown"),
-        err.message
+        error::bounded_error_detail(&err.message)
     );
     err.into_response()
 }
