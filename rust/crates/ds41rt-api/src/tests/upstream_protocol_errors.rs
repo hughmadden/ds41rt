@@ -415,3 +415,38 @@ async fn error_messages_do_not_contain_filesystem_paths() {
 // Upstream: TestAffectedModulesUseSanitize — SKIPPED. Source-scan checks that
 // named Python modules import sanitize_message have no ds41rt analog (no
 // sanitizer module exists to grep for).
+
+/// The production serving path (native_v41 router, mounted by the daemon) must
+/// bound serde invalid-type echoes the same way as the lib.rs JsonRejection
+/// path — verified live on the fleet 2026-09-15 (100 KB echo pre-fix).
+#[tokio::test]
+async fn native_v41_long_offending_input_is_bounded_in_the_error_body() {
+    let (queue, _rx) = tokio::sync::mpsc::channel(1);
+    let app = crate::native_v41::router(queue);
+    let long_string_input = json!({
+        "model": "deepseek-ai/DeepSeek-V4.1-Flash",
+        "messages": [{"role": "user", "content": "hello"}],
+        "temperature": "A".repeat(100_000)
+    })
+    .to_string();
+    let response = app
+        .oneshot(
+            Request::builder()
+                .method(Method::POST)
+                .uri("/v1/chat/completions")
+                .header("content-type", "application/json")
+                .body(Body::from(long_string_input))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+    let body = to_bytes(response.into_body(), usize::MAX).await.unwrap();
+    assert!(
+        body.len() < 4_000,
+        "native_v41 error body must be bounded, was {} bytes",
+        body.len()
+    );
+    let text = String::from_utf8(body.to_vec()).unwrap();
+    assert!(text.contains("truncated"), "bounded body must carry the truncation marker");
+}
