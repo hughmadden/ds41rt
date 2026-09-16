@@ -59,6 +59,18 @@ Two classes are labeled in each file header and counted separately:
   sparkinfer (`3882b935`) does not provide. Pre-dates this change; tracked
   separately.
 
+## Validation ledger (2026-09-16, Romeo dev image, CUDA 13)
+
+| Rev | Rust workspace passed | failed | ignored |
+|---|---|---|---|
+| `1b62a76` (v3 port tip, pre-test-coverage) | 1581 | 6 | 83 |
+| `8754acca` (this change) | 1777 | 6 | 83 |
+
+Delta: +196 tests, zero new failures, zero new skips. The 6 failures are the
+identical pre-existing `b12x` planner/skew set (`dsa_indexer.SOURCE_LAYOUT_PAGED`
+vs sparkinfer `3882b935`), unchanged in name and count on both revisions.
+Python (pg, this change): 454 passed, 7 documented skips.
+
 ## Product fixes included (each verified by the ported tests)
 
 1. `api`: 400 error bodies bounded (JsonRejection, native-router serde
