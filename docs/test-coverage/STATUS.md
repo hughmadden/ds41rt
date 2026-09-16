@@ -59,3 +59,27 @@ Final rust workspace: see BASELINE.md known-env failures only (6, UC-5).
   concurrency 16/16 x 200.
 - Fork state: hostcache/rc4-v3 = 7bf38d4c (deployed), test-coverage/upstream-port =
   60787e5. Both pushed via gh.
+
+## Phase 6 — review follow-up (astra gpt-6-astra + default-model reviews), DONE
+Verdicts: first review RESTRUCTURE (1 BLOCKER), astra FIX-FIRST (7 MAJOR/6 MINOR).
+All findings addressed or labeled:
+- BLOCKER/MAJOR 1: central ApiError bound + stderr bound + regressions (b016fac9).
+- MAJOR 3/4: FP4 halfway ties (encode via round_to_e2m1), FP8 NaN 0x7F/0xFF (4e0d89d2).
+- MAJOR 5: dual-RTX /v1/stats handle threaded through (7b2c9a7d, PR line).
+- MAJOR 2: .[test] extra + importorskip guard.
+- MAJOR 6: COVERAGE CLASS oracle labels on all standalone-spec files.
+- MAJOR 7: native-router protocol/streaming suite (upstream_native_v41.rs, 5 tests).
+- Minors: true completion-tie test; rank 32/33 boundary + diagnostic; hostcache
+  winning-partial divergence inside snapshot; transport deadline tests on paused
+  Tokio time (test-util dev-dep); EOF whitespace.
+- Docs: concise UPSTREAM-TESTS.md (immutable upstream SHAs, run commands, classes,
+  skips, fixes) replaces the campaign bundle ON THE PR LINE (8754acca); the full
+  census/baseline/deferred/status stays on this branch.
+- Validation ledger (Romeo dev image): base 1b62a76 = 1581p/6f/83i; final PR line
+  = 1777p/6f/83i → +196 tests, zero new failures/skips; identical 6 b12x-skew set.
+  (eeb17ea itself does not compile its daemon tests — the v3 port repair commits
+  existed to fix that; baseline taken at 1b62a76 instead.)
+Final: pg workspace 1722p/6f/50i (same 6 env failures); python 454p/7skip.
+Fork: hostcache/rc4-v3 = 5fd3ece7 (PR-ready line), test-coverage/upstream-port =
+campaign branch (f0f45241 + STATUS update pending this commit).
+Next: optional astra re-review of 5fd3ece7, then open the PR to tpurtell.
