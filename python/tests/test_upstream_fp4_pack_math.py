@@ -49,13 +49,12 @@ Upstream expectation notes (ds41rt-documented behavior asserted instead):
   upstream's group math with a tail extension: the partial last group keeps
   its own scale computed over only the elements present (never reads past
   the end of the tensor).
-"""
-"""
-COVERAGE CLASS: standalone reference oracle. These cases document upstream
-behavior with no ds41rt dependency; they cannot detect product regressions by
-themselves. They are the comparison references for the deferred GPU parity
-tests (docs/test-coverage/DEFERRED.md), counted separately from product
-regression coverage (review MAJOR 4/6, 2026-09-15).
+
+COVERAGE CLASS: standalone reference oracle. These cases document
+upstream behavior with no ds41rt dependency; they cannot detect
+product regressions by themselves. They are the comparison
+references for the deferred GPU-parity tests, counted separately
+from product regression coverage (review MAJOR 4/6, 2026-09-15).
 """
 
 

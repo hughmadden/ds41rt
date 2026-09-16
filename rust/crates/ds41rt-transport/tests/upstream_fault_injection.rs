@@ -40,11 +40,11 @@
 //!
 //! All servers are loopback `127.0.0.1:0` listeners; no native/ffi calls.
 
-// COVERAGE CLASS: standalone reference oracle. These cases document upstream
-// behavior with no ds41rt dependency; they cannot detect product regressions
-// by themselves. They are the comparison references for the deferred GPU
-// parity tests (docs/test-coverage/DEFERRED.md) and are counted separately
-// from product regression coverage (review MAJOR 4/6, 2026-09-15).
+// COVERAGE CLASS: mixed suite (review follow-up 2026-09-16).
+// GROUPS BELOW MARKED `contract model` ARE STANDALONE REFERENCE MODELS
+// // (no ds41rt dependency, cannot detect product regressions alone). The
+// // remaining groups (timeout/failover/drain over loopback TCP) exercise
+// // ds41rt-transport directly and ARE product regression coverage.
 
 use anyhow::{Context, Result};
 use ds41rt_core::{
@@ -173,26 +173,25 @@ async fn spawn_echo_server() -> Result<(
     SocketAddr,
     tokio::sync::oneshot::Sender<()>,
     Arc<AtomicUsize>,
+    JoinHandle<()>,
 )> {
     let listener = TcpListener::bind("127.0.0.1:0").await?;
     let addr = listener.local_addr()?;
     let accepts = Arc::new(AtomicUsize::new(0));
     let (shutdown_tx, shutdown_rx) = tokio::sync::oneshot::channel::<()>();
-    spawn_echo_accept_loop(listener, Arc::clone(&accepts), shutdown_rx);
-    Ok((addr, shutdown_tx, accepts))
+    let server = spawn_echo_accept_loop(listener, Arc::clone(&accepts), shutdown_rx);
+    Ok((addr, shutdown_tx, accepts, server))
 }
 
-async fn wait_for_port_closed(addr: SocketAddr) {
-    tokio::time::timeout(Duration::from_secs(3), async {
-        loop {
-            if TcpStream::connect(addr).await.is_err() {
-                return;
-            }
-            tokio::time::sleep(Duration::from_millis(20)).await;
-        }
-    })
-    .await
-    .expect("port should refuse connections after server shutdown");
+// Await the accept loop's own exit instead of probing the port with real
+// connections: a probe can be accepted (bumping the counter later asserted
+// exact) in the same scheduling window as shutdown handling (review follow-up
+// 2026-09-16).
+async fn await_server_exit(handle: JoinHandle<()>, what: &str) {
+    tokio::time::timeout(Duration::from_secs(3), handle)
+        .await
+        .unwrap_or_else(|_| panic!("{what} must exit promptly after shutdown"))
+        .expect("server task panicked");
 }
 
 async fn rebind_listener(addr: SocketAddr) -> Result<TcpListener> {
@@ -550,14 +549,14 @@ async fn dead_server_fails_fast_and_recovers_after_listener_restart() -> Result<
     // Full worker death: the listener goes away between requests. The next
     // call must fail fast with a connect error (not wedge), and once a worker
     // is listening again the same client must recover via reconnect.
-    let (addr, shutdown, _accepts) = spawn_echo_server().await?;
+    let (addr, shutdown, _accepts, server_task) = spawn_echo_server().await?;
     let mut client = TcpProtocolV2PersistentClient::new(addr, TcpTransportConfig::default());
     let request = test_request(6_110)?;
     client.roundtrip(&request).await?;
 
     // Whole-worker death: listener and every accepted connection go away.
     let _ = shutdown.send(());
-    wait_for_port_closed(addr).await;
+    await_server_exit(server_task, "echo server").await;
 
     let started = Instant::now();
     let err = client
@@ -595,8 +594,8 @@ async fn host_batch_dispatch_recovers_after_single_host_death() -> Result<()> {
     // batch set each. One worker dies; the dispatch must fail cleanly; after
     // it is restarted the persistent fan-out client must recover (its
     // reset-on-error contract drops all dead connections).
-    let (addr_a, shutdown_a, accepts_a) = spawn_echo_server().await?;
-    let (addr_b, shutdown_b, accepts_b) = spawn_echo_server().await?;
+    let (addr_a, shutdown_a, accepts_a, server_a) = spawn_echo_server().await?;
+    let (addr_b, shutdown_b, accepts_b, server_b) = spawn_echo_server().await?;
     let targets = vec![
         TcpProtocolV2HostBatchTarget {
             host: "ostrich".to_owned(),
@@ -621,7 +620,8 @@ async fn host_batch_dispatch_recovers_after_single_host_death() -> Result<()> {
 
     // Kill worker "dodo" mid-traffic.
     let _ = shutdown_b.send(());
-    wait_for_port_closed(addr_b).await;
+    await_server_exit(server_b, "host-batch worker b").await;
+    let _ = server_a;
 
     let err = client
         .dispatch_bf16(&set, &global_hidden, 6_210)
@@ -925,13 +925,20 @@ async fn dropping_pending_dispatch_cancels_the_in_flight_request() -> Result<()>
     .expect("worker consumed the fully written request");
     drop(pending); // client cancels mid-flight, before any response chunk
 
-    // Give the worker a beat to observe the socket close.
-    tokio::time::sleep(Duration::from_millis(50)).await;
-    assert_eq!(
-        accepts.load(Ordering::SeqCst),
-        1,
-        "no replay on the cancelled connection"
-    );
+    // Bounded settle: poll for the close to be observed while asserting the
+    // accept count never grows (a replay would exceed 1) — deterministic
+    // unlike a fixed sleep (review follow-up 2026-09-16).
+    tokio::time::timeout(Duration::from_secs(2), async {
+        let mut last = 1;
+        while last == 1 {
+            tokio::time::sleep(Duration::from_millis(10)).await;
+            last = accepts.load(Ordering::SeqCst);
+            assert_eq!(last, 1, "no replay on the cancelled connection");
+        }
+    })
+    .await
+    .expect_err("count stays at 1 until the timeout (replay would exceed it)");
+    assert_eq!(accepts.load(Ordering::SeqCst), 1);
 
     let follow_up = test_request(6_321)?;
     let response = client
