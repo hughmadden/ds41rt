@@ -14,6 +14,12 @@
 //! - sglang spec bookkeeping/ownership tests (invariant class, AST guards
 //!   not portable; the scheduling-ownership invariants are noted as unmapped)
 
+// COVERAGE CLASS: standalone reference oracle. These cases document upstream
+// behavior with no ds41rt dependency; they cannot detect product regressions
+// by themselves. They are the comparison references for the deferred GPU
+// parity tests (docs/test-coverage/DEFERRED.md) and are counted separately
+// from product regression coverage (review MAJOR 4/6, 2026-09-15).
+
 use ds41rt_core::{
     select_dspark_confidence_prefix, select_dspark_prefixes, verify_dspark_greedy,
 };

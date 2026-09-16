@@ -50,6 +50,14 @@ Upstream expectation notes (ds41rt-documented behavior asserted instead):
   its own scale computed over only the elements present (never reads past
   the end of the tensor).
 """
+"""
+COVERAGE CLASS: standalone reference oracle. These cases document upstream
+behavior with no ds41rt dependency; they cannot detect product regressions by
+themselves. They are the comparison references for the deferred GPU parity
+tests (docs/test-coverage/DEFERRED.md), counted separately from product
+regression coverage (review MAJOR 4/6, 2026-09-15).
+"""
+
 
 from __future__ import annotations
 
@@ -113,8 +121,14 @@ def encode_e2m1(values: np.ndarray) -> np.ndarray:
     ax = np.abs(values)
     finite = np.isfinite(ax)
     ax = np.where(finite, np.minimum(ax, E2M1_MAX), np.nan)
-    # Nearest-magnitude search over the full E2M1 table (0b111 -> 6.0).
-    idx = np.argmin(np.abs(E2M1_MAGNITUDES[None, :] - ax[..., None]), axis=-1)
+    # Round with the file's canonical upstream-pinned boundaries
+    # (round_to_e2m1), then exact table lookup. argmin-on-distance picked the
+    # lower magnitude on halfway ties (0.75 -> 0.5), contradicting that
+    # convention (0.75 -> 1.0) — review finding 2026-09-15.
+    rounded = round_to_e2m1(ax)
+    idx = np.zeros(rounded.shape, dtype=np.int64)
+    for i, magnitude in enumerate(E2M1_MAGNITUDES):
+        idx = np.where(rounded == magnitude, i, idx)
     nibble = idx.astype(np.uint8) | sign_bit
     return np.where(finite, nibble, np.uint8(0x7) | sign_bit)
 
@@ -166,15 +180,18 @@ def e4m3_encode(values: np.ndarray) -> np.ndarray:
     NaN encodes to 0x7F/0xFF per the e4m3fn convention.
     """
     x = np.clip(np.asarray(values, dtype=np.float32), E4M3_MIN, E4M3_MAX)
-    x = np.where(np.isnan(x), np.float32(np.nan), x)
-    sign = ((x.view(np.uint32) >> 24) & 0x80).astype(np.uint8)
+    input_is_nan = np.isnan(x)
+    # NaN sign comes from the INPUT (clip/where can canonicalize it away);
+    # e4m3fn NaN bytes are 0x7F/0xFF — 0x07 is a finite value (review finding
+    # 2026-09-15: NaN encoded as 0x07 decoded back to 0.013671875).
+    sign = np.where(np.signbit(np.asarray(values, dtype=np.float32)), np.uint8(0x80), np.uint8(0))
     ax = np.minimum(np.abs(x), np.float32(E4M3_MAX))
     bits = ax.view(np.uint32)
     ieee_exp = ((bits >> 23) & 0xFF).astype(np.int64)
     ieee_man = (bits & 0x7FFFFF).astype(np.int64)
 
     is_zero = ax == 0
-    is_nan = np.isnan(ax)
+    is_nan = input_is_nan
     # Normal e4m3 range: ax >= 2^-6 (ieee biased exp >= 121).
     is_normal = (~is_zero) & (ieee_exp >= 121)
     # Round-to-nearest-even collapse of the 23-bit mantissa to 3 bits.
@@ -190,7 +207,7 @@ def e4m3_encode(values: np.ndarray) -> np.ndarray:
     sub_byte = sub_quantum.astype(np.int64)
 
     byte = np.where(is_normal, normal_byte, sub_byte)
-    byte = np.where(is_zero | is_nan, np.where(is_nan, 0x7, 0), byte).astype(np.uint8)
+    byte = np.where(is_zero | is_nan, np.where(is_nan, 0x7F, 0), byte).astype(np.uint8)
     return byte | sign
 
 
@@ -776,3 +793,42 @@ def test_lloyd_max_deterministic():
     c2, b2 = solve_lloyd_max(128, 3)
     np.testing.assert_array_equal(c1, c2)
     np.testing.assert_array_equal(b1, b2)
+
+
+# ---------------------------------------------------------------------------
+# Review findings 2026-09-15 (astra): halfway ties and non-finite encodes
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize("value,expected", [
+    (0.75, 1.0), (1.25, 1.0), (1.75, 2.0), (2.5, 2.0), (3.5, 4.0),
+    (-0.75, -1.0), (-1.75, -2.0), (-3.5, -4.0),
+])
+def test_e2m1_encode_halfway_boundaries_match_round_to_e2m1(value, expected):
+    # encode_e2m1 must agree with the file's canonical round_to_e2m1 at every
+    # halfway boundary (argmin previously rounded all ties DOWN).
+    nibble = encode_e2m1(np.array([value]))[0]
+    assert decode_e2m1(np.array([nibble]))[0] == expected
+
+
+def test_e2m1_encode_matches_round_to_e2m1_on_dense_grid():
+    rng = np.random.default_rng(11)
+    grid = np.concatenate([
+        rng.uniform(-7, 7, 4000),
+        np.array([0.25, 0.75, 1.25, 1.75, 2.5, 3.5, 5.0, -0.25, -2.5]),
+    ])
+    decoded = decode_e2m1(encode_e2m1(grid))
+    assert np.array_equal(decoded, round_to_e2m1(grid))
+
+
+def test_e4m3_encode_nan_roundtrips_to_nan_with_sign():
+    for value in (np.nan, -np.nan):
+        byte = e4m3_encode(np.array([value]))[0]
+        assert byte in (0x7F, 0xFF), f"NaN must encode to 0x7F/0xFF, got {byte:#04x}"
+        decoded = e4m3_decode(np.array([byte]))[0]
+        assert np.isnan(decoded), f"{byte:#04x} decoded to {decoded}, expected NaN"
+
+
+def test_e4m3_encode_inf_saturates_signed_max():
+    assert e4m3_decode(e4m3_encode(np.array([np.inf])))[0] == 448.0
+    assert e4m3_decode(e4m3_encode(np.array([-np.inf])))[0] == -448.0

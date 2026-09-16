@@ -33,6 +33,14 @@ Semantics mirrored from llama-sampler.cpp (as of the upstream test):
   token via ``std::mt19937``, which only affects ``selected``, not ``p``, so
   the rng itself is not part of this oracle).
 """
+"""
+COVERAGE CLASS: standalone reference oracle. These cases document upstream
+behavior with no ds41rt dependency; they cannot detect product regressions by
+themselves. They are the comparison references for the deferred GPU parity
+tests (docs/test-coverage/DEFERRED.md), counted separately from product
+regression coverage (review MAJOR 4/6, 2026-09-15).
+"""
+
 
 from dataclasses import dataclass, field
 

@@ -288,13 +288,7 @@ fn row_window_byte_math_has_no_usize_wraparound() {
     );
 }
 
-#[test]
-fn absurd_tensor_rank_is_rejected() {
-    // Ported invariant: a header declaring an absurd number of dimensions
-    // (upstream: n_dims = 1_000_000) must be rejected.
-    let tempdir = tempfile::tempdir().unwrap();
-    let path = tempdir.path().join("evil_rank.safetensors");
-    let rank = 1_000_000_usize;
+fn write_rank_header(path: &std::path::Path, rank: usize) {
     let header = serde_json::json!({
         "bad_tensor": {
             "dtype": "F32",
@@ -306,13 +300,34 @@ fn absurd_tensor_rank_is_rejected() {
     while (8 + header_bytes.len()) % 8 != 0 {
         header_bytes.push(b' ');
     }
-    let mut file = File::create(&path).unwrap();
+    let mut file = File::create(path).unwrap();
     file.write_all(&(header_bytes.len() as u64).to_le_bytes()).unwrap();
     file.write_all(&header_bytes).unwrap();
     file.write_all(&[0_u8; 16]).unwrap();
+}
 
-    let metadata = read_safetensors_metadata(&path).unwrap_err();
-    let _ = metadata;
+#[test]
+fn tensor_rank_policy_boundaries_and_diagnostic() {
+    // Rank 32 is ds41rt's policy ceiling (ported from the upstream gguf-py
+    // n_dims-bound class); 33 must be rejected with a diagnostic naming the
+    // tensor, the observed rank, and the maximum. Review 2026-09-15: the
+    // original test only exercised rank 1_000_000 and discarded the error.
+    let tempdir = tempfile::tempdir().unwrap();
+
+    let ok_path = tempdir.path().join("rank32.safetensors");
+    write_rank_header(&ok_path, 32);
+    read_safetensors_metadata(&ok_path).expect("rank 32 must be accepted");
+
+    let bad_path = tempdir.path().join("rank33.safetensors");
+    write_rank_header(&bad_path, 33);
+    let err = read_safetensors_metadata(&bad_path).unwrap_err().to_string();
+    assert!(err.contains("bad_tensor"), "diagnostic names the tensor: {err}");
+    assert!(err.contains("absurd rank 33"), "diagnostic carries the observed rank: {err}");
+    assert!(err.contains("max 32"), "diagnostic carries the bound: {err}");
+
+    let absurd_path = tempdir.path().join("absurd.safetensors");
+    write_rank_header(&absurd_path, 1_000_000);
+    assert!(read_safetensors_metadata(&absurd_path).is_err());
 }
 
 // ---------------------------------------------------------------------------
