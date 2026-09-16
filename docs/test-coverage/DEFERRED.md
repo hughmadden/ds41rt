@@ -31,12 +31,11 @@ DeepSeek-V4.1-Flash outputs in the fleet window (**UC-3**):
 Each has a pinned-behavior test in `upstream_tool_calls.rs`; if the fleet window shows
 real outputs that trip these, fix the parser and flip the tests to the vLLM semantics.
 
-4. **Unset temperature is greedy** — ds41rt treats an absent `temperature` as 0.0
-   (greedy), diverging from the OpenAI/vLLM default of 1.0; the 1.0/0.95/50 sampling
-   defaults in `request_sampling_params` are unreachable unless temperature is set
-   explicitly. Pinned by tests in `upstream_sampler.rs`. Likely intentional for the
-   current eval harnesses, but an OpenAI-compatibility question for the owner before
-   broad client exposure; validate against real client traffic in the fleet window.
+4. ~~**Unset temperature is greedy**~~ RESOLVED 2026-09-15 on the live native
+   serving path: `native_v41` rejects any `temperature != 0` with 400 ("native
+   target sampling currently requires temperature=0"), so greedy-by-default is the
+   documented production contract, not an accident. The api-crate path retains the
+   pinned `upstream_sampler.rs` behavior; no owner action needed for native clients.
 
 
 ## C1 — OpenAI protocol / API surface (186 rows)

@@ -97,7 +97,9 @@ fn error(status: StatusCode, message: impl ToString) -> Response {
     // Bound upstream parse/validation details before they reach the response
     // body: serde invalid-type errors echo the full offending string (e.g. a
     // 100 KB string in a wrongly-typed field). Same class as the JsonRejection
-    // echo fixed in lib.rs (upstream vLLM #49239).
+    // echo fixed in lib.rs (upstream vLLM #49239). This router is the
+    // production serving path (mounted by the daemon) — verified live on the
+    // fleet 2026-09-15.
     let message = crate::error::bounded_error_detail(&message.to_string());
     (
         status,
