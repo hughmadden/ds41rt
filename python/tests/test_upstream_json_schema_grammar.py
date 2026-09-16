@@ -28,7 +28,13 @@ without a model tokenizer.
 import json
 
 import pytest
-import xgrammar as xgr
+
+xgr = pytest.importorskip(
+    "xgrammar",
+    reason="pinned test dependency: install with `pip install .[test]` "
+    "(xgrammar==0.2.6 python bindings; the native engine uses the "
+    "third_party/xgrammar submodule built separately)",
+)
 
 # 256-entry raw byte vocab so accept_string can drive whole documents.
 _VOCAB = [bytes([i]) for i in range(256)]

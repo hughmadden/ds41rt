@@ -98,6 +98,23 @@ async fn same_start_ties_are_broken_by_list_order() {
     );
 }
 
+/// Port of vLLM's true same-completion tie (`ab` vs `b` in "...ab"): stops that
+/// COMPLETE at the same position but start at different offsets. The
+/// list-order tie-break decides the winner, so reversing the order must change
+/// the truncation point. (Review 2026-09-15: the prefix-pair test above shares
+/// a start and cannot detect a `<` vs `<=` regression.)
+#[tokio::test]
+async fn completion_ties_are_broken_by_list_order() {
+    for (stops, expected) in [
+        (vec!["from ds41rt".to_owned(), "ds41rt".to_owned()], "hello "),
+        (vec!["ds41rt".to_owned(), "from ds41rt".to_owned()], "hello from "),
+    ] {
+        let output = tiny_output_with_stop(StopSpec::Many(stops), None).await;
+        assert_eq!(output.content.as_deref(), Some(expected));
+        assert_eq!(output.finish_reason, "stop");
+    }
+}
+
 /// Port of `test_completion_position_not_start_position`.
 /// `from ds41rt tiny` *starts* earlier (6) than `ds41rt` (11) but *completes*
 /// later (22 vs 17). vLLM selects `ds41rt` (earliest completion) and

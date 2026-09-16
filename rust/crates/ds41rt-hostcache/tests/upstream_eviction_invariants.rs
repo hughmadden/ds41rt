@@ -274,12 +274,15 @@ fn exact_ancestor_trades_off_against_a_longer_partial_match() {
     let ancestor = snap(&mut device, SnapshotKind::Turn, &seq(0, 250), &[id(30, 1)]);
     write_snapshot(cache.engine_mut(), &ancestor);
     store_resident(&mut cache, &ancestor, 1);
-    let longer = snap(&mut device, SnapshotKind::Turn, &seq(0, 380), &[id(31, 2)]);
+    // 500 tokens so the winning query below diverges INSIDE the snapshot
+    // (review 2026-09-15: at 380 the query matched the whole frontier and the
+    // winning-partial-match branch was never exercised).
+    let longer = snap(&mut device, SnapshotKind::Turn, &seq(0, 500), &[id(31, 2)]);
     write_snapshot(cache.engine_mut(), &longer);
     store_resident(&mut cache, &longer, 2);
 
     let key_of_ancestor = cache.lookup(&seq(0, 250)).expect("ancestor").key;
-    let key_of_longer = cache.lookup(&seq(0, 380)).expect("longer").key;
+    let key_of_longer = cache.lookup(&seq(0, 500)).expect("longer").key;
 
     // Divergence at 377: the partial candidate saves (377/2*2)-128 = 248 < 250: ancestor wins.
     let mut query = seq(0, 377);
@@ -295,12 +298,20 @@ fn exact_ancestor_trades_off_against_a_longer_partial_match() {
     assert_eq!(hit.key, key_of_ancestor, "tie prefers the exact ancestor");
     assert_eq!((hit.common, hit.frontier), (250, 250));
 
-    // Divergence at 380: the partial candidate saves 380-128 = 252 > 250: the longer wins.
-    let mut query = seq(0, 380);
+    // Divergence at 381, inside the 500-token snapshot: saves 380-128 = 252 > 250,
+    // so the longer PARTIAL match wins over the exact ancestor.
+    let mut query = seq(0, 381);
+    query.push(999);
+    let hit = cache.lookup(&query).expect("hit");
+    assert_eq!(hit.key, key_of_longer, "winning partial match beats exact ancestor");
+    assert_eq!(hit.common, 381);
+
+    // Full-frontier query still resolves to the complete longer snapshot.
+    let mut query = seq(0, 500);
     query.push(999);
     let hit = cache.lookup(&query).expect("hit");
     assert_eq!(hit.key, key_of_longer);
-    assert_eq!((hit.common, hit.frontier), (380, 380));
+    assert_eq!((hit.common, hit.frontier), (500, 500));
 }
 
 /// Port of the sglang radix split invariants (`test_insert_then_match_round_trips` plus edge
@@ -549,4 +560,3 @@ fn on_evict_deferred_store_commits_clean_through_the_evict_path() {
     assert_eq!(cache.payload(hit.key), Some(&1));
     assert_eq!(cache.metrics().device_evictions, 1);
 }
-

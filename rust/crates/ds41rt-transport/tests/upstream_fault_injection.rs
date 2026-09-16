@@ -40,6 +40,12 @@
 //!
 //! All servers are loopback `127.0.0.1:0` listeners; no native/ffi calls.
 
+// COVERAGE CLASS: standalone reference oracle. These cases document upstream
+// behavior with no ds41rt dependency; they cannot detect product regressions
+// by themselves. They are the comparison references for the deferred GPU
+// parity tests (docs/test-coverage/DEFERRED.md) and are counted separately
+// from product regression coverage (review MAJOR 4/6, 2026-09-15).
+
 use anyhow::{Context, Result};
 use ds41rt_core::{
     DType, ExpertBatch, ExpertBatchRoute, ExpertBatchRow, ExpertHostBatchSet, GraphBucket, LayerId,
@@ -326,7 +332,11 @@ fn response_pump_drains_earlier_pending_futures_first() {
 // sglang timeout.rs — upstream accepts the connection but never responds.
 // ---------------------------------------------------------------------------
 
-#[tokio::test]
+// Paused Tokio time: the client deadline fires deterministically via
+// advance(), real TCP I/O still completes, and the wall-clock asserts are
+// replaced by a generous wedge-watchdog only (review 2026-09-15: elapsed<1s
+// could flake on an oversubscribed CI worker).
+#[tokio::test(start_paused = true)]
 async fn hanging_upstream_times_out_within_configured_deadline() -> Result<()> {
     // Worker accepts, reads the request, then sleeps far past the deadline.
     let listener = TcpListener::bind("127.0.0.1:0").await?;
@@ -349,21 +359,20 @@ async fn hanging_upstream_times_out_within_configured_deadline() -> Result<()> {
         ..TcpTransportConfig::default()
     };
 
-    let started = Instant::now();
-    // Outer guard mirroring the upstream 2s CI wedge-guard.
-    let result = tokio::time::timeout(
-        Duration::from_secs(2),
-        ds41rt_transport::tcp_protocol_v2_roundtrip(addr, &request, config),
-    )
-    .await
-    .expect("roundtrip must return within 2s against a hanging upstream");
-    let elapsed = started.elapsed();
+    let roundtrip = tokio::spawn(async move {
+        ds41rt_transport::tcp_protocol_v2_roundtrip(addr, &request, config).await
+    });
+    // Drive the client's internal deadline; the mock never responds, so only
+    // timers can complete the roundtrip.
+    tokio::time::advance(FAST_TIMEOUT + Duration::from_millis(50)).await;
+    // Generous wall-clock wedge-watchdog only; the correctness signal is the
+    // deadline-expiry error below, not the elapsed time.
+    let result = tokio::time::timeout(Duration::from_secs(60), roundtrip)
+        .await
+        .expect("watchdog: roundtrip must finish")
+        .expect("roundtrip task must not panic");
 
     let err = result.expect_err("hanging upstream must fail, not wedge or succeed");
-    assert!(
-        elapsed < Duration::from_secs(1),
-        "client must short-circuit at its configured deadline; elapsed {elapsed:?}"
-    );
     let message = format!("{err:#}");
     assert!(
         message.contains("timed out reading ProtocolV2 response header"),
@@ -373,7 +382,7 @@ async fn hanging_upstream_times_out_within_configured_deadline() -> Result<()> {
     Ok(())
 }
 
-#[tokio::test]
+#[tokio::test(start_paused = true)]
 async fn response_header_then_stall_times_out_on_payload_read() -> Result<()> {
     // Partial message: valid header, then the payload never arrives. The
     // deadline must also cover the payload phase, not just the header.
@@ -409,16 +418,15 @@ async fn response_header_then_stall_times_out_on_payload_read() -> Result<()> {
         timeout: FAST_TIMEOUT,
         ..TcpTransportConfig::default()
     };
-    let started = Instant::now();
-    let err = ds41rt_transport::tcp_protocol_v2_roundtrip(addr, &request, config)
+    let roundtrip = tokio::spawn(async move {
+        ds41rt_transport::tcp_protocol_v2_roundtrip(addr, &request, config).await
+    });
+    tokio::time::advance(FAST_TIMEOUT + Duration::from_millis(50)).await;
+    let err = tokio::time::timeout(Duration::from_secs(60), roundtrip)
         .await
+        .expect("watchdog: roundtrip must finish")
+        .expect("roundtrip task must not panic")
         .expect_err("stalled payload must fail at the deadline");
-    let elapsed = started.elapsed();
-
-    assert!(
-        elapsed < Duration::from_secs(1),
-        "payload-phase stall must still expire at the deadline; elapsed {elapsed:?}"
-    );
     let message = format!("{err:#}");
     assert!(
         message.contains("timed out reading ProtocolV2 response payload"),

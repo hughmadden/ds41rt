@@ -22,6 +22,12 @@
 //! bounds concurrency by fixed slots (`args.concurrency`), which the slot
 //! model tests below cover instead.
 
+// COVERAGE CLASS: standalone reference oracle. These cases document upstream
+// behavior with no ds41rt dependency; they cannot detect product regressions
+// by themselves. They are the comparison references for the deferred GPU
+// parity tests (docs/test-coverage/DEFERRED.md) and are counted separately
+// from product regression coverage (review MAJOR 4/6, 2026-09-15).
+
 use ds41rt_core::{
     admit_layerwaves_for_iteration, LayerWave, LayerWaveMode, MtpVerifyBlock, PrefillChunk,
     PrefillChunkPolicy, Priority,
