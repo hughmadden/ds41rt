@@ -122,7 +122,7 @@ fn worker(
     ready: &mut Option<oneshot::Sender<std::result::Result<(), String>>>,
     stats: std::sync::Arc<std::sync::Mutex<serde_json::Value>>,
 ) -> Result<()> {
-    if args.rtx_gpus == 2 { return distributed::worker(args, receive, ready); }
+    if args.rtx_gpus == 2 { return distributed::worker(args, receive, ready, stats); }
     let capacity = prefill_capacity(args.prefill_batch_tokens)?;
     let rows = capacity as usize;
     let lib = unsafe { NativeLibrary::load(&args.native_lib)? };
