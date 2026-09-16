@@ -39,14 +39,16 @@ python -m pytest tests/
 
 ## Coverage classes
 
-Two classes are labeled in each file header and counted separately:
+Two classes are labeled per file — per GROUP for mixed suites — and counted
+separately (re-review 2026-09-16):
 
-1. **Product regression coverage** — exercises ds41rt code; failures mean
-   product regressions.
-2. **Standalone reference oracles** — document upstream behavior with no
-   ds41rt dependency (e.g. llama.cpp's exact sampler vectors). They are the
-   comparison references for the deferred GPU-parity tests and cannot
-   detect product regressions alone.
+1. **Product regression coverage** (~250 tests) — exercises ds41rt code;
+   failures mean product regressions.
+2. **Standalone reference oracles** (~140 tests) — document upstream behavior
+   with no ds41rt dependency (llama.cpp sampler vectors, FP4/FP8 pack math,
+   contract-model groups in transport/admission/spec suites). They are the
+   comparison references for the deferred GPU-parity tests and cannot detect
+   product regressions alone.
 
 ## Skips and known failures
 
@@ -54,10 +56,15 @@ Two classes are labeled in each file header and counted separately:
   cannot enforce (`pattern`, `minLength`, `maxLength`, allOf merging,
   `uniqueItems`, `not`); re-check on a submodule bump. The module
   `pytest.importorskip`s xgrammar so a clean env skips rather than errors.
-- Six pre-existing daemon tests fail on the v3 line: the Python planner
-  expects a `b12x` API (`dsa_indexer.SOURCE_LAYOUT_PAGED`) the v3-pinned
-  sparkinfer (`3882b935`) does not provide. Pre-dates this change; tracked
-  separately.
+- Six pre-existing daemon tests fail identically on both revisions (the
+  Python planner expects a `b12x` API — `dsa_indexer.SOURCE_LAYOUT_PAGED` —
+  the v3-pinned sparkinfer `3882b935` does not provide; pre-dates this
+  change): `flash_native_nvfp4_target_storage_uses_exact_compact_physical_pages`,
+  `flash_smoke_target_storage_pads_c128_indices_to_sm120_prefill_tile`,
+  `flash_target_mhc_is_bounded_by_active_frontier_not_context`,
+  `flash_target_storage_keeps_one_workspace_and_persistent_hc_kv`,
+  `target_graph_metadata_is_bounded_by_sequence_not_shared_pool`,
+  `real_checkpoint_nvfp4_decode_matches_python_fixture`.
 
 ## Product fixes included (each verified by the ported tests)
 
