@@ -1001,3 +1001,10 @@ impl Drop for CompressorWave<'_, '_> {
         }
     }
 }
+
+impl<'a> CompressorState<'a> {
+    /// The source page cache, for the host cache's page copies and allocations.
+    pub fn source_cache(&self) -> &source_cache::SourceCache<'a> {
+        &self.index
+    }
+}
