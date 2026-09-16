@@ -11,7 +11,8 @@ use crate::v41_target_pass::{DistributedTargetPass, TargetTapWave};
 use std::rc::Rc;
 
 pub(super) fn worker(args: crate::cli::NativeServeArgs, mut receive: mpsc::Receiver<NativeRequest>,
-    ready: &mut Option<oneshot::Sender<std::result::Result<(), String>>>) -> Result<()> {
+    ready: &mut Option<oneshot::Sender<std::result::Result<(), String>>>,
+    stats: std::sync::Arc<std::sync::Mutex<serde_json::Value>>) -> Result<()> {
     ensure!(matches!(args.rtx_expert_layers, memory::LocalLayers::Auto | memory::LocalLayers::Count(20)),
         "two RTX serving requires all 20 encoder expert layers");
     prefill_capacity(args.prefill_batch_tokens)?;
@@ -255,7 +256,7 @@ pub(super) fn worker(args: crate::cli::NativeServeArgs, mut receive: mpsc::Recei
     ready.take().context("startup readiness missing")?.send(Ok(()))
         .map_err(|_| anyhow::anyhow!("API startup cancelled"))?;
     scheduler::serve(&lib, &args, &runtime, &mut receive, &mut pass, &mut second, &mut requests,
-        &mut transport, &mut second_transport, draft.as_mut().map(|d| d.get_mut()), &mut vision)
+        &mut transport, &mut second_transport, draft.as_mut().map(|d| d.get_mut()), &mut vision, stats)
 }
 
 
@@ -288,7 +289,8 @@ mod tests {
         }
         drop(send);
         let (ready, mut readiness) = oneshot::channel();
-        super::super::worker(args, receive, &mut Some(ready))?;
+            let stats = std::sync::Arc::new(std::sync::Mutex::new(serde_json::Value::Null));
+            super::super::worker(args, receive, &mut Some(ready), stats)?;
         readiness.try_recv()?.map_err(anyhow::Error::msg)?;
         for (i, mut output) in outputs.into_iter().enumerate() {
             let mut ready = 0;
