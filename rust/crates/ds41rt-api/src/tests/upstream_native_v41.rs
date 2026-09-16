@@ -165,3 +165,40 @@ async fn non_stream_body_carries_content_and_finish_reason() {
         + choice["message"]["reasoning_content"].as_str().unwrap_or("");
     assert!(text.contains("hello"), "processed text is carried: {value}");
 }
+
+#[tokio::test]
+async fn invalid_tool_definition_rejected_before_queueing() {
+    let app = app();
+    let mut body = valid_request();
+    body["tools"] = json!([{"type": "function"}]);
+    let response = app.oneshot(post_json(body)).await.unwrap();
+    let (status, value, len) = response_json(response).await;
+    assert_eq!(status, StatusCode::BAD_REQUEST);
+    assert!(len < 4_000, "tool-validation errors stay bounded: {len}");
+    assert!(value["error"]["message"].is_string());
+}
+
+#[tokio::test]
+async fn valid_tool_list_flows_into_the_queued_constraint() {
+    let (queue, mut rx) = tokio::sync::mpsc::channel(4);
+    let app = router(queue);
+    tokio::spawn(async move {
+        let job = rx.recv().await.expect("worker receives the request");
+        assert!(
+            job.constraint.is_some(),
+            "a valid tool list must reach the worker as a native constraint"
+        );
+        job.events
+            .send(Ok(InferenceChunk::Finish { finish_reason: InferenceFinishReason::Stop }))
+            .await
+            .expect("event accepted");
+    });
+    let mut body = valid_request();
+    body["tools"] = json!([{
+        "type": "function",
+        "function": {"name": "get_weather", "parameters": {"type": "object"}}
+    }]);
+    let response = app.oneshot(post_json(body)).await.unwrap();
+    let (status, _value, _) = response_json(response).await;
+    assert_eq!(status, StatusCode::OK);
+}
