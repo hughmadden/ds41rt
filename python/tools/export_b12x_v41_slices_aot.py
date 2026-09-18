@@ -270,7 +270,7 @@ def export(output, capacities, width, atomic_min_capacity=None, role="spark", *,
     (output / "v41_experts.json").write_text(json.dumps(manifest, indent=2) + "\n")
 
 
-if __name__ == "__main__":
+def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--role", choices=("spark", "coordinator", "rtx_backbone", "rtx_tp2"), default="spark")
     parser.add_argument("--output-dir", type=Path, required=True)
@@ -280,8 +280,8 @@ if __name__ == "__main__":
         required=True,
         help="64/128/192 or explicit capacity:width pairs, e.g. 1:64,16:192,80:192",
     )
-    parser.add_argument("--atomic-min-capacity", type=int, choices=[256, 1024, 4096],
-                        help="Use ABI 3 direct FP32 token accumulation at these larger capacities")
+    parser.add_argument("--atomic-min-capacity", type=int, choices=[256, 1024, 4096, 4097],
+                        help="Use ABI 3 direct FP32 token accumulation at this capacity or above; 4097 keeps all supported capacities ordered")
     parser.add_argument("--standard-names", action="store_true")
     args = parser.parse_args()
     capacities = tuple(int(x) for x in args.rows.split(","))
@@ -307,3 +307,7 @@ if __name__ == "__main__":
         parser.error(str(error))
     export(args.output_dir, capacities, width, args.atomic_min_capacity, args.role,
            standard_names=args.standard_names)
+
+
+if __name__ == "__main__":
+    main()
