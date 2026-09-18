@@ -2,8 +2,12 @@
 
 This packet makes the retained native target callable from the Rust library,
 without starting its HTTP server or replacing vLLM scheduling and sampling.
-Serving integration remains disabled. CPU ownership tests pass; model loading,
-GPU execution, numerical parity and performance have not been run for this seam.
+Serving integration remains disabled. The retained native Rust probe at
+`c6e7bafa` passed two-context GPU prefill, one-token decode and cancellation;
+all 129280 logits were byte-identical between contexts and source credits
+returned after release. This is a correctness smoke, not a throughput result.
+The new C ABI has separate CPU lifetime tests; its GPU/Python consumer path
+still needs live qualification.
 
 `native_executor::target::with_target(config, callback)` loads the native library
 and coordinator weights using the original one-RTX constructor, then supplies
@@ -33,10 +37,15 @@ binding; those are not yet integrated through this interface.
 
 `TargetConfig` contains an externally minted nonzero `owner` incarnation nonce,
 snapshot and native-library paths, four peer addresses, requested `batch_tokens`,
-`max_context_tokens`, request `slots` and explicit `cache_bytes`. The nonce must
+`max_context_tokens`, request `slots` and explicit `cache_bytes`. Despite the
+legacy Rust field name, that input is the paired compressed-source payload
+budget (`NativeServeArgs.kv_pool_size`), rounded down to native page groups.
+Fixed windows and cache metadata are additional. `CacheInfo.source_payload_bytes`
+reports actual paired payload; `CacheInfo.cache_bytes` reports the total native
+cache allocation plan. The first GPU probe requested 536870912 bytes and reported
+536791040 payload bytes / 542270160 total cache bytes. The nonce must
 not repeat across worker restarts. The actual BackboneCache owner is bound to
-this nonce before its first admission, so native request leases and the future
-schema-1 command envelope can share the same owner identity. The CLI's existing
+this nonce before its first admission. The CLI's existing
 automatic owner allocation is unchanged.
 
 Capacity uses the original constructor's AOT rounding (80 requested rows require
@@ -55,6 +64,7 @@ Request tokens and selected rows remain owned until publication or cancellation.
 | `context.commit(ticket, accepted)` | After logits consumers drain, calls actual `TargetPass::commit` → `Requests::commit` → native window/source/Engram publication; returns authoritative committed extent. Errors poison the integration scope. |
 | `context.cancel(ticket)` | After dropping its execution future/output borrows, synchronizes transport, aborts any queued cache publication and discards native private work before releasing the scheduling lease. |
 | `bank.release(request)` | Refuses live target batches/readers and delegates native request release, preserving generation validation. |
+| `bank.can_prepare(&[(request, tokens)])` | Delegates the actual aggregate append-capacity check. Only typed pool exhaustion yields false; no reservation remains after the query. Requests must be idle and unique; tokens may describe the entire remaining context. |
 | `bank.committed_end(request)` / `bank.info()` | Reads actual native cache extent, actual source capacities/free credits, and the constructor's physical byte plan. |
 
 `Logits::device_buffer()` is unsafe because a raw CUDA descriptor cannot express
@@ -72,36 +82,27 @@ whose `BackboneCache` owns real `SourceCache` allocations and the canonical
 prefix dictionary. Only the two scheduling tickets are tracked outside the bank.
 Never construct the schema-1 `CacheCommands` metadata prototype beside it.
 
-Full target execution is the current bound. Overlapping chunks of one prompt,
-encoder streaming, decoder-suffix replay, prefix snapshots, image inputs and
-dSpark transactions still need typed work descriptors and retained executor
-bindings. This interface rejects an encoder/replay-stage request rather than
-pretending a full-target call implements that path. No native sampler is exposed;
-the final vLLM adapter must consume logits using its existing sampling semantics.
+Full target execution is the C ABI's current bound. The separate
+[streaming facade](afd-native-streaming.md) now exposes retained encoder chunks
+and final-decoder replay in Rust and passed bounded GPU probes. The actor still
+needs a quiescent mode switch to call it while holding both contexts. Prefix
+snapshots, image inputs and dSpark transactions are not bound here. The full-target
+interface rejects encoder/replay-stage requests. No native sampler is exposed;
+the vLLM adapter must consume logits using its existing sampling semantics.
 
-## Remaining dynamic binding
+## Dynamic binding
 
-Use the existing bridge's opaque handle registry and owned command channels for
-a dependency-free C ABI. A dedicated CUDA thread enters `with_target` and runs
-the command loop inside its callback. It may pin each of two execution futures
-locally, polling commands/completions on the existing current-thread runtime;
-the futures must never be made `Send`, self-referential or leaked to `'static`.
+[ABI 1](afd-native-target-abi.md) exposes this constructor through a dependency-free
+C shared library. One CUDA owner thread enters `with_target`; two local lane
+actors keep their execution futures and borrowed results inside that callback.
+The schema-1 `CacheCommands` prototype is not instantiated. All ACK credits and
+committed extents come from the actual native bank.
 
-The external interface still needs create/init reply, owned-token submit,
-bounded wait/poll, result-lease acquisition/release, accepted publication,
-cancel/drain and close. An exported logits pointer must retain its context until
-an explicitly retained consumer CUDA event proves the external read completed.
-Close/cancel cannot free an outstanding result lease merely because the Python
-caller returned or a timer elapsed. Exact handles must include the executor
-incarnation and ticket generation; errors cannot consume unrelated requests.
-
-The schema-1 handler then needs to route accepted publication to these actual
-target contexts and build ACK snapshots from the real bank. Its `Begin(rows)`
-command alone is insufficient to execute a model: the binding must also supply
-owned tokens, source kind, selected logits rows and phase. Source-only prefix
-references must continue to be excluded from complete model cache-hit reporting.
-No C ABI, JSON-to-target handler, vLLM physical-cache delegation or serving
-selection is implemented by this packet.
+The C ABI covers asynchronous initialization, owned-token submit, execute/poll,
+logits leases, native-observed CUDA consumer completion, accepted publication,
+cancellation, release and shutdown. No future becomes `Send`, self-referential
+or leaked to static lifetime. Python/vLLM serving integration and the C ABI's
+live GPU consumer validation remain separate gates.
 
 ## CPU proof
 
@@ -181,3 +182,11 @@ while the first request still publishes. Both requests are then released and
 their source credits checked. Default execution is one prefill forward, with no
 warmup or graph-performance claim. The two example tests check host-logit
 geometry/finiteness/tie handling and exact default token/step bounds on CPU.
+
+The campaign parent ran the development-profile `c6e7bafa` native probe on
+19 September 2026 AEST: two full-target contexts produced byte-identical logits
+for the 10-token APPLE input, then for the next greedy decode token. Greedy IDs
+were `[21992,4392]`; canceling the second ready decode left accepted extents
+`[11,10]`, and releasing both requests restored all source credits. Evidence is
+retained in the recipes campaign `native-transplant-20260919/receipts/` under
+`native-target-probe-c6e7bafa-*`. This does not establish model quality or speed.

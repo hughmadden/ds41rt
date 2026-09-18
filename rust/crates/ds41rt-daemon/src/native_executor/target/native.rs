@@ -19,7 +19,8 @@ pub struct TargetConfig {
     pub batch_tokens: u32,
     pub max_context_tokens: u32,
     pub slots: u32,
-    /// Exact native physical cache budget, including windows and source pools.
+    /// Paired compressed-source payload budget, rounded down to page groups.
+    /// Fixed windows and cache metadata are additional; see CacheInfo.cache_bytes.
     pub cache_bytes: usize,
 }
 impl TargetConfig {
@@ -47,12 +48,13 @@ impl TargetConfig {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, serde::Serialize)]
 pub struct CacheInfo {
     pub owner: u64,
     pub capacity_rows: u32,
     pub source_page_capacity: [usize; 4],
     pub source_pages_free: [usize; 4],
+    pub source_payload_bytes: usize,
     pub cache_bytes: usize,
 }
 
@@ -62,6 +64,7 @@ pub struct NativeBank<'s, 'a> {
     requests: Rc<RefCell<&'s mut Requests<'a>>>,
     active: Rc<Active>,
     info: CacheInfo,
+    max_context: u64,
 }
 impl<'s, 'a> NativeBank<'s, 'a> {
     pub(crate) fn library(&self) -> &'a ds41rt_ffi::NativeLibrary {
@@ -78,6 +81,25 @@ impl<'s, 'a> NativeBank<'s, 'a> {
     pub fn committed_end(&self, request: RequestHandle) -> Result<u64> {
         self.active.healthy()?;
         self.requests.borrow().cache().committed_end(request)
+    }
+    /// Read-only future append feasibility against the real native page bank.
+    /// This does not retain reservations or authorize execution by itself.
+    pub fn can_prepare(&self, work: &[(RequestHandle, u32)]) -> Result<bool> {
+        ensure!(!work.is_empty() && work.len() <= 16, "invalid capacity query count");
+        let requests = self.requests.borrow();
+        for (i, &(request, tokens)) in work.iter().enumerate() {
+            self.active.idle(request)?;
+            ensure!(!work[..i].iter().any(|&(r, _)| r == request), "duplicate capacity query request");
+            let end = requests.cache().committed_end(request)?;
+            ensure!(end.checked_add(u64::from(tokens)).is_some_and(|end| end <= self.max_context),
+                "capacity query exceeds context bound");
+            ensure!(requests.cache().stage(request)? == CacheStage::Full, "capacity query requires full-target stage");
+        }
+        match requests.cache().check_append_capacity(work) {
+            Ok(()) => Ok(true),
+            Err(error) if error.is::<crate::v41_compressor::source_cache::SourcePoolExhausted>() => Ok(false),
+            Err(error) => Err(error),
+        }
     }
     pub fn info(&self) -> CacheInfo {
         let requests = self.requests.borrow();
@@ -223,9 +245,12 @@ pub fn with_target<R>(config: TargetConfig,
             requests: requests.clone(), max_context: args.max_context_tokens as u64 };
         let second = NativeDriver { pass: parts.prefill_pass, transport: parts.prefill_transport,
             requests: requests.clone(), max_context: args.max_context_tokens as u64 };
-        let bank = NativeBank { requests, active: active.clone(), info: CacheInfo {
+        let bank = NativeBank { requests, active: active.clone(), max_context: args.max_context_tokens as u64, info: CacheInfo {
             owner, capacity_rows: parts.capacity, source_page_capacity: parts.source_pages,
-            source_pages_free: parts.source_pages, cache_bytes: parts.cache_bytes,
+            source_pages_free: parts.source_pages,
+            source_payload_bytes: parts.source_pages.iter().sum::<usize>() * 256
+                * (68 + ds41rt_ffi::V41Kv::COMPRESSED_ROW_BYTES),
+            cache_bytes: parts.cache_bytes,
         } };
         run(NativeTarget { bank, runtime: parts.runtime, contexts: [
             TargetContext::new(first, active.clone(), 0, parts.capacity as usize, 48),

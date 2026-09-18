@@ -38,7 +38,8 @@ fn emit(value: Value) -> Result<()> {
 fn info(value: &CacheInfo) -> Value {
     json!({"owner": value.owner, "capacity_rows": value.capacity_rows,
         "source_page_capacity": value.source_page_capacity,
-        "source_pages_free": value.source_pages_free, "cache_bytes": value.cache_bytes})
+        "source_pages_free": value.source_pages_free, "source_payload_bytes": value.source_payload_bytes,
+        "cache_bytes": value.cache_bytes})
 }
 fn logits(bytes: &[u8]) -> Result<Vec<f32>> {
     ensure!(bytes.len() == 129280 * 4, "expected one full FP32 vocabulary row");
@@ -69,7 +70,7 @@ fn main() -> Result<()> {
         .with_env_filter(tracing_subscriber::EnvFilter::from_default_env()).init();
     emit(json!({"event":"start", "purpose":"native_target_gpu_smoke_not_throughput",
         "owner":args.owner, "tokens":args.tokens, "steps":args.steps,
-        "cancel_ready":args.cancel_ready, "cache_budget_bytes":args.cache_bytes,
+        "cancel_ready":args.cancel_ready, "source_pool_budget_bytes":args.cache_bytes,
         "batch_tokens":args.batch_tokens, "warmup_performed":false}))?;
     let startup = Instant::now();
     let config = TargetConfig { owner: args.owner, snapshot: args.snapshot,

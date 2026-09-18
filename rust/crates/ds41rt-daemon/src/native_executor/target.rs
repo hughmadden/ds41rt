@@ -8,10 +8,12 @@ pub use ds41rt_transport::ExpertV2SourceKind as SourceKind;
 use std::{cell::{Cell, RefCell}, rc::Rc};
 
 mod native;
+mod ffi;
 pub use native::{with_target, NativeBank, NativeDriver, NativeTarget, TargetConfig, CacheInfo};
 pub use native::{StreamInput, StreamingResult};
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct Ticket { pub request: RequestHandle, pub lane: usize, pub id: u64 }
 
 /// Owned input. These are internal batch identities, not HTTP request IDs.
@@ -112,6 +114,7 @@ impl<D: TargetDriver> TargetContext<D> {
         self.active.healthy()?;
         ensure!(self.job.is_none(), "target lane busy");
         ensure!(!input.tokens.is_empty() && input.tokens.len() <= self.capacity, "invalid target row count");
+        ensure!(input.tokens.iter().all(|&token| token < 129280), "target token ID exceeds vocabulary");
         ensure!(!input.selected.is_empty() && input.selected.len() <= self.head_capacity
             && input.selected.iter().all(|&row| row < input.tokens.len()), "invalid selected logits rows");
         ensure!(input.selected.windows(2).all(|w| w[0] < w[1]), "selected logits rows must increase");

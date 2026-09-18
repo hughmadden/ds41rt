@@ -244,6 +244,19 @@ fn inputs_are_owned_until_execution_and_invalid_selection_never_prepares() -> Re
 }
 
 #[test]
+fn invalid_token_ids_are_rejected_before_native_preparation() -> Result<()> {
+    let mut f=fixture();
+    for token in [129280,u32::MAX] {
+        let mut request=input(f.requests[0],1);request.tokens[0]=token;
+        assert!(f.lanes[0].submit(request).is_err());
+    }
+    let mut request=input(f.requests[0],1);request.tokens[0]=129279;
+    let ticket=f.lanes[0].submit(request)?;
+    f.lanes[0].cancel(ticket)?;
+    Ok(())
+}
+
+#[test]
 fn native_page_reservations_rollback_on_failed_publication() -> Result<()> {
     let mut f = fixture(); f.control.borrow_mut().ready[0] = true;
     let ticket = f.lanes[0].submit(input(f.requests[0], 257))?;
