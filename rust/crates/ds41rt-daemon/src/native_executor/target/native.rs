@@ -3,6 +3,10 @@ use crate::{v41_backbone_cache::CacheStage, v41_experts::coordinator::NativeTp4W
     v41_requests::{RequestBatch, RequestTokens, Requests}, v41_target_pass::TargetPass};
 use std::{net::SocketAddr, path::PathBuf};
 
+#[path = "stream.rs"]
+mod stream;
+pub use stream::{StreamInput, StreamingResult};
+
 /// Explicit target-only construction. vLLM must delegate its physical KV and
 /// backbone weight allocation before invoking this factory. This does not load
 /// dSpark, run a sampler, create a listener, or start the native HTTP scheduler.
@@ -59,7 +63,10 @@ pub struct NativeBank<'s, 'a> {
     active: Rc<Active>,
     info: CacheInfo,
 }
-impl NativeBank<'_, '_> {
+impl<'s, 'a> NativeBank<'s, 'a> {
+    pub(crate) fn library(&self) -> &'a ds41rt_ffi::NativeLibrary {
+        self.requests.borrow().cache().prefix_library()
+    }
     pub fn admit(&self, slot: usize, request_id: u64) -> Result<RequestHandle> {
         self.active.healthy()?;
         self.requests.borrow_mut().admit(slot, request_id)

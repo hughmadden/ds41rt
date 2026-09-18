@@ -9,6 +9,7 @@ use std::{cell::{Cell, RefCell}, rc::Rc};
 
 mod native;
 pub use native::{with_target, NativeBank, NativeDriver, NativeTarget, TargetConfig, CacheInfo};
+pub use native::{StreamInput, StreamingResult};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Ticket { pub request: RequestHandle, pub lane: usize, pub id: u64 }
