@@ -222,6 +222,15 @@ impl Bridge {
             .slots
             .get(lane)
             .ok_or((crate::INVALID, "lane out of range".into()))?;
+        // Reject unavailable lanes before inspecting or copying payload bytes.
+        // Keep admission locked through decode/send so concurrent callers cannot
+        // both reserve this lane while only one bounded request slot exists.
+        let mut slot = slot
+            .lock()
+            .map_err(|_| (crate::INTERNAL, "lane mutex poisoned".into()))?;
+        if matches!(slot.state, PENDING | READY) {
+            return Err((crate::BUSY, "lane has pending or uncollected output".into()));
+        }
         if frame.len() > self.config.max_frame_bytes {
             return Err((crate::INVALID, "request exceeds max_frame_bytes".into()));
         }
@@ -231,12 +240,6 @@ impl Bridge {
             .map_err(|e| (crate::INVALID, format!("invalid native request: {e:#}")))?;
         let request = ExpertProtocolV2Request::decode(frame)
             .map_err(|e| (crate::INVALID, format!("invalid request frame: {e:#}")))?;
-        let mut slot = slot
-            .lock()
-            .map_err(|_| (crate::INTERNAL, "lane mutex poisoned".into()))?;
-        if matches!(slot.state, PENDING | READY) {
-            return Err((crate::BUSY, "lane has pending or uncollected output".into()));
-        }
         let ticket = self
             .next_ticket
             .fetch_update(Ordering::Relaxed, Ordering::Relaxed, |n| n.checked_add(1))

@@ -96,3 +96,20 @@ count. Median loopback times were 1,057 / 1,091 / 2,298 / 4,674 microseconds for
 tagged-output validation; they are not isolated transport latency and carry no
 fleet or parity claim. Both the explicit eight-party dispatch barrier and the
 stalled-lane test prove independent progress without relying on timing ratios.
+
+### Admission-path correction, 2026-09-19 07:27 AEST
+
+Review found that a BUSY lane still parsed/copied the entire submitted request
+before rejecting admission. `submit` now takes the lane lock and checks its
+lease before frame inspection, holding that lock through accepted decode/send
+so concurrent callers cannot double-admit. No ticket or payload allocation is
+consumed by BUSY. The new real-loopback regression failed before the fix
+(`INVALID` instead of `BUSY`), then passed: malformed input is rejected as BUSY
+for both pending and uncollected-ready lanes, and reaches the parser only after
+the result is collected. This is a structural regression check, not a timing
+threshold.
+
+Requalification: **9/9 native release tests** including the explicit diagnostic,
+**9/9 parent Python ctypes integration tests**, offline locked release build.
+Current release SHA256:
+`9df6774bd1407ae7070c67ea910ae6e7d2e514433a8fcc8e1e39f7f09b4bdf1f`.

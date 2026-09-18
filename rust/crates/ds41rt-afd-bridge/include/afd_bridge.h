@@ -38,6 +38,7 @@ int32_t afd_bridge_create(const uint8_t *config_json, size_t len,
 /* Copies and validates one canonical native ProtocolV2 request. Native codec,
  * top-6/5120/FP8-K32 or BF16 contract and four executor identities are reused.
  * One pending or uncollected READY result per lane; excess admission is BUSY.
+ * BUSY is checked before request parsing/copying, including for malformed input.
  * FAILED/CANCELLED lanes may accept a new generation. Tickets are unique and
  * monotonic within a bridge, including across lanes; every operation rejects a
  * foreign-lane ticket or a ticket superseded by a later submit on its lane.

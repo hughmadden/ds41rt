@@ -344,6 +344,57 @@ fn two_lanes_dispatch_before_any_rank_replies_and_bound_admission() {
 }
 
 #[test]
+fn busy_admission_precedes_frame_inspection_without_consuming_ticket() {
+    let fleet = Fleet::new(|_, id| {
+        if id == 1 {
+            Action::Stall
+        } else {
+            Action::Reply
+        }
+    });
+    let client = Client::new(&fleet, 1000);
+    let pending = client.submit(0, 1, 1);
+    let ready = client.submit(1, 2, 1);
+    assert_eq!(client.wait(1, ready), 2);
+    let malformed = [0xff];
+    // Both pending and uncollected-ready lanes reject before codec work. The
+    // same bytes must reach the parser only after the lease becomes available.
+    for lane in [0, 1] {
+        let mut untouched_ticket = 999;
+        assert_eq!(
+            unsafe {
+                afd_bridge_submit(
+                    client.0,
+                    lane,
+                    malformed.as_ptr(),
+                    malformed.len(),
+                    &mut untouched_ticket,
+                )
+            },
+            BUSY
+        );
+        assert_eq!(untouched_ticket, 999);
+    }
+    client.collect(1, ready, 2, 1);
+    let mut untouched_ticket = 999;
+    assert_eq!(
+        unsafe {
+            afd_bridge_submit(
+                client.0,
+                1,
+                malformed.as_ptr(),
+                malformed.len(),
+                &mut untouched_ticket,
+            )
+        },
+        INVALID
+    );
+    assert_eq!(untouched_ticket, 999);
+    assert_eq!(unsafe { afd_bridge_cancel(client.0, 0, pending) }, OK);
+    assert_eq!(client.wait(0, pending), 4);
+}
+
+#[test]
 fn stalled_lane_does_not_block_peer_and_cancel_resets_before_reuse() {
     let fleet = Fleet::new(|_, id| {
         if id == 1 {
