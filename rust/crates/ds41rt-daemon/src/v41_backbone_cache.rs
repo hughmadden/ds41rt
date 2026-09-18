@@ -26,11 +26,22 @@ pub(crate) use ced::CacheStage;
 const SOURCES: [usize; 4] = [2, 8, 14, 20];
 static NEXT_BATCH: AtomicU64 = AtomicU64::new(1);
 static NEXT_OWNER: AtomicU64 = AtomicU64::new(1);
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub(crate) struct CacheLease {
+#[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub struct CacheLease {
     owner: u64,
     slot: usize,
     generation: u64,
+}
+impl CacheLease {
+    pub fn owner(&self) -> u64 { self.owner }
+    pub fn slot(&self) -> usize { self.slot }
+    pub fn generation(&self) -> u64 { self.generation }
+    pub(crate) fn new(owner: u64, slot: usize, generation: u64) -> Self {
+        Self { owner, slot, generation }
+    }
+    pub(crate) fn matches(&self, owner: u64, generations: &[u64]) -> bool {
+        self.owner == owner && generations.get(self.slot) == Some(&self.generation)
+    }
 }
 struct Request {
     id: u64,
@@ -285,9 +296,7 @@ impl<'a> BackboneCache<'a> {
     fn request_identity(&self, lease: CacheLease) -> Result<&Request> {
         self.healthy()?;
         ensure!(
-            lease.owner == self.owner
-                && lease.slot < self.requests.len()
-                && self.generations[lease.slot] == lease.generation,
+            lease.matches(self.owner, &self.generations),
             "foreign or stale backbone cache lease"
         );
         self.requests[lease.slot]

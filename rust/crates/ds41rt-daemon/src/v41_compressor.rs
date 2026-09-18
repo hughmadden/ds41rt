@@ -8,7 +8,7 @@ use std::{
     ffi::c_void,
     sync::atomic::{AtomicU64, Ordering},
 };
-mod source_cache;
+pub(crate) mod source_cache;
 mod commit;
 use commit::PendingCommit;
 mod prefix;

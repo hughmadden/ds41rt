@@ -7,6 +7,8 @@ use std::{cell::RefCell, rc::Rc};
 mod ownership;
 use ownership::PagePool;
 mod reservation;
+mod metadata;
+pub(crate) use metadata::SourcePages;
 use reservation::PageReservation;
 pub(crate) use ownership::SourcePrefix;
 
@@ -40,18 +42,20 @@ pub(crate) struct SourceCache<'a> {
     lengths: DeviceAllocation<'a>,
     staging: HostAllocation<'a>,
     stride: usize,
-    pages: [Vec<u32>; 16],
-    rows: [usize; 16],
-    pool: Rc<RefCell<PagePool>>,
-    writing: Rc<std::cell::Cell<u16>>,
+    metadata: SourcePages,
 }
-pub(super) struct IndexPlan {
+pub(crate) struct IndexPlan {
     additions: Vec<(usize, Vec<u32>)>,
     used: usize,
     lengths: Vec<(usize, u64)>,
     // Shared partial pages are copied before accepted rows are appended.
     replacements: Vec<(usize, usize, u32, u32)>,
     reservation: Option<PageReservation>,
+}
+impl IndexPlan {
+    pub(crate) fn tail_copies(&self) -> Vec<(u32, u32)> {
+        self.replacements.iter().map(|&(_, _, old, new)| (old, new)).collect()
+    }
 }
 /// Only rows below `rows` are initialized. Logical row r uses physical page
 /// pages[r / 256], offset r % 256. Drain device consumers before mutating owner.
@@ -74,6 +78,13 @@ pub(crate) struct KvCacheView<'a> {
     pub rows: usize,
     pub device_pages: Ds41rtDeviceBuffer,
     pub device_rows: Ds41rtDeviceBuffer,
+}
+impl std::ops::Deref for SourceCache<'_> {
+    type Target = SourcePages;
+    fn deref(&self) -> &Self::Target { &self.metadata }
+}
+impl std::ops::DerefMut for SourceCache<'_> {
+    fn deref_mut(&mut self) -> &mut Self::Target { &mut self.metadata }
 }
 impl<'a> SourceCache<'a> {
     pub fn device_bytes(pages: usize, slots: usize) -> Result<usize> {
@@ -98,10 +109,7 @@ impl<'a> SourceCache<'a> {
             kv_values: DeviceAllocation::new(library, pages * PAGE_ROWS * KV_VALUES)?,
             kv_scales: DeviceAllocation::new(library, pages * PAGE_ROWS * KV_SCALES)?,
             capacity: pages * PAGE_ROWS,
-            pages: std::array::from_fn(|_| vec![]),
-            rows: [0; 16],
-            pool: Rc::new(RefCell::new(PagePool::new(pages))),
-            writing: Default::default(),
+            metadata: SourcePages::new(pages, slots)?,
         })
     }
     pub fn view(&self, slot: usize, rows: usize) -> IndexCacheView<'_> {
@@ -129,21 +137,6 @@ impl<'a> SourceCache<'a> {
             device_rows: index.device_rows,
         }
     }
-    pub fn ensure_idle(&self, slot: usize) -> Result<()> {
-        ensure!(slot < self.lengths.buffer.bytes / 8 && self.writing.get() & (1 << slot) == 0,
-            "compressed cache slot has a pending append");
-        Ok(())
-    }
-    pub fn release(&mut self, slot: usize) -> Result<()> {
-        self.ensure_idle(slot)?;
-        // Caller first revokes the host lease, and has drained all consumers.
-        self.pool.borrow_mut().release(&self.pages[slot]);
-        self.pages[slot].clear();
-        self.rows[slot] = 0;
-        // The lease is revoked and consumers drained. reset/restore installs
-        // replacement device metadata before a new owner becomes usable.
-        Ok(())
-    }
     pub fn reset(&self, slot: usize) -> Result<()> {
         self.ensure_idle(slot)?;
         self.lengths
@@ -163,54 +156,10 @@ impl<'a> SourceCache<'a> {
             rows(self.kv_scales.buffer, KV_SCALES),
         ]
     }
-    /// Identity generation of `page`: changes whenever the page is freed and reused.
-    pub fn page_generation(&self, page: u32) -> u32 {
-        self.pool.borrow().generation(page)
-    }
-    /// A prefix over `count` freshly allocated pages holding `rows` rows, for the host cache to
-    /// fill; the prefix owns the pages. `SourcePoolExhausted` when fewer pages are free.
-    pub fn allocate_prefix(&self, count: usize, rows: usize) -> Result<SourcePrefix> {
-        ensure!(rows <= count * PAGE_ROWS, "allocated prefix rows exceed its pages");
-        let mut pool = self.pool.borrow_mut();
-        let available = pool.free.len();
-        let pages = pool.allocate(count).ok_or(SourcePoolExhausted {
-            work_index: 0,
-            needed: count,
-            available,
-        })?;
-        Ok(SourcePrefix {
-            pool: Rc::clone(&self.pool),
-            pages,
-            rows,
-        })
-    }
-    /// Retain initialized source rows without copying GPU data. Callers drain
-    /// consumers and supply the authoritative committed row count.
-    pub fn retain_prefix(&self, slot: usize, rows: usize) -> Result<SourcePrefix> {
-        self.ensure_idle(slot)?;
-        ensure!(
-            slot < self.lengths.buffer.bytes / 8 && rows <= self.rows[slot],
-            "source prefix exceeds initialized page table"
-        );
-        let pages = self.pages[slot][..rows.div_ceil(PAGE_ROWS)].to_vec();
-        self.pool.borrow_mut().retain(&pages);
-        Ok(SourcePrefix {
-            pool: Rc::clone(&self.pool),
-            pages,
-            rows,
-        })
-    }
     /// Attach a retained source to a fresh request. Device metadata is installed
     /// before host publication; a later append privately copies a shared tail.
     pub fn restore_prefix(&mut self, slot: usize, prefix: &SourcePrefix) -> Result<()> {
-        self.ensure_idle(slot)?;
-        ensure!(
-            slot < self.lengths.buffer.bytes / 8
-                && self.pages[slot].is_empty()
-                && Rc::ptr_eq(&self.pool, &prefix.pool)
-                && prefix.pages.len() <= self.stride,
-            "foreign source prefix or occupied destination"
-        );
+        self.metadata.validate_restore(slot, prefix)?;
         let library = self.lengths.library;
         let bytes: Vec<u8> = prefix.pages.iter().flat_map(|p| p.to_ne_bytes()).collect();
         if !bytes.is_empty() {
@@ -223,10 +172,7 @@ impl<'a> SourceCache<'a> {
             slice(self.lengths.buffer, slot * 8, 8),
             &(prefix.rows as u64).to_ne_bytes(),
         )?;
-        self.pool.borrow_mut().retain(&prefix.pages);
-        self.pages[slot] = prefix.pages.clone();
-        self.rows[slot] = prefix.rows;
-        Ok(())
+        self.metadata.restore_prefix(slot, prefix)
     }
     /// # Safety
     /// Enqueue before accepted row writes. The plan owns destinations and append
@@ -272,137 +218,7 @@ impl<'a> SourceCache<'a> {
         unsafe { upload_metadata(self.lengths.library, self.page_table.buffer, self.lengths.buffer,
             self.stride, starts, plan, staging, stream) }
     }
-    pub fn validate_plan(&self, plan: &IndexPlan) -> Result<()> {
-        let reservation = plan.reservation.as_ref().ok_or_else(|| anyhow::anyhow!("source plan not reserved"))?;
-        ensure!(Rc::ptr_eq(&reservation.pool, &self.pool)
-            && self.writing.get() & reservation.mask == reservation.mask, "foreign or lost source reservation");
-        Ok(())
-    }
-    /// Atomically claim the append slots and free pages after validating every
-    /// participant. Disjoint plans may coexist and apply in either order. After
-    /// queueing GPU writes, drain before applying or dropping the plan.
-    pub fn reserve(&self, appends: &[(usize, usize, usize)]) -> Result<IndexPlan> {
-        let mut plan = IndexPlan {
-            additions: vec![],
-            used: 0,
-            lengths: vec![],
-            replacements: vec![],
-            reservation: None,
-        };
-        let mut pool = self.pool.borrow_mut();
-        let mut seen = [false; 16];
-        for &(slot, old, new) in appends {
-            ensure!(
-                slot < self.lengths.buffer.bytes / 8 && !seen[slot],
-                "duplicate or invalid index slot"
-            );
-            self.ensure_idle(slot)?;
-            seen[slot] = true;
-            ensure!(
-                old == self.rows[slot]
-                    && old <= new
-                    && new <= 1048576
-                    && self.pages[slot].len() == old.div_ceil(PAGE_ROWS),
-                "index history binding differs"
-            );
-        }
-        for (position, &(slot, old, new)) in appends.iter().enumerate() {
-            plan.lengths.push((slot, new as u64));
-            if new > old && old % PAGE_ROWS != 0 {
-                let logical = old / PAGE_ROWS;
-                let source = self.pages[slot][logical];
-                if pool.shared(source) {
-                    // If every owner appends in this transaction, one can keep
-                    // the original. All tail copies precede every accepted write,
-                    // including writes by that owner. A snapshot or non-appending
-                    // owner prevents this optimization. Exclusive appends avoid
-                    // this bounded (at most sixteen owners) scan entirely.
-                    let mut writers = 0;
-                    let mut last = position;
-                    for (i, &(other, begin, end)) in appends.iter().enumerate() {
-                        if end > begin
-                            && begin % PAGE_ROWS != 0
-                            && self.pages[other][begin / PAGE_ROWS] == source
-                        {
-                            writers += 1;
-                            last = i;
-                        }
-                    }
-                    if writers != pool.references(source) || position != last {
-                        ensure!(
-                            plan.used < pool.free.len(),
-                            SourcePoolExhausted { work_index: position, needed: 1, available: pool.free.len() - plan.used }
-                        );
-                        let destination = pool.free[pool.free.len() - plan.used - 1];
-                        plan.used += 1;
-                        plan.replacements.push((slot, logical, source, destination));
-                    }
-                }
-            }
-            let extra = new.div_ceil(PAGE_ROWS) - self.pages[slot].len();
-            ensure!(
-                extra <= pool.free.len() - plan.used,
-                SourcePoolExhausted { work_index: position, needed: extra, available: pool.free.len() - plan.used }
-            );
-            let end = pool.free.len() - plan.used;
-            plan.additions.push((
-                slot,
-                pool.free[end - extra..end].iter().rev().copied().collect(),
-            ));
-            plan.used += extra;
-        }
-        let remaining = pool.free.len() - plan.used;
-        let pages = pool.free.split_off(remaining);
-        let mask = seen.iter().enumerate().fold(0u16, |mask, (slot, &used)|
-            mask | if used { 1 << slot } else { 0 });
-        self.writing.set(self.writing.get() | mask);
-        plan.reservation = Some(PageReservation { pool: self.pool.clone(), pages,
-            flags: self.writing.clone(), mask });
-        Ok(plan)
-    }
-    pub fn destination(&self, plan: &IndexPlan, slot: usize, row: usize) -> Result<u64> {
-        let logical_page = row / PAGE_ROWS;
-        let old = &self.pages[slot];
-        let page = if let Some(&(_, _, _, destination)) = plan
-            .replacements
-            .iter()
-            .find(|&&(s, logical, _, _)| s == slot && logical == logical_page)
-        {
-            destination
-        } else if logical_page < old.len() {
-            old[logical_page]
-        } else {
-            let new = plan
-                .additions
-                .iter()
-                .find(|(s, _)| *s == slot)
-                .ok_or_else(|| anyhow::anyhow!("index append missing"))?;
-            *new.1
-                .get(logical_page - old.len())
-                .ok_or_else(|| anyhow::anyhow!("index append outside reservation"))?
-        };
-        Ok(u64::from(page) * PAGE_ROWS as u64 + (row % PAGE_ROWS) as u64)
-    }
-    pub fn apply(&mut self, mut plan: IndexPlan) {
-        let mut reservation = plan.reservation.take().expect("source plan is not reserved");
-        assert!(Rc::ptr_eq(&self.pool, &reservation.pool), "foreign source plan");
-        let mut pool = self.pool.borrow_mut();
-        for (slot, logical, old, new) in plan.replacements {
-            pool.retain(&[new]);
-            pool.release(&[old]);
-            self.pages[slot][logical] = new;
-        }
-        for (slot, pages) in plan.additions {
-            pool.retain(&pages);
-            self.pages[slot].extend(pages);
-        }
-        for (slot, rows) in plan.lengths {
-            self.rows[slot] = rows as usize;
-        }
-        reservation.pages.clear(); // Page references now belong to request tables.
-        drop(pool); // Reservation drop must not reborrow an active pool borrow.
-        drop(reservation);
-    }
+
 }
 
 unsafe fn upload_metadata(library: &NativeLibrary, page_table: Ds41rtDeviceBuffer,
