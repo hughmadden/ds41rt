@@ -733,6 +733,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "ds41rt-afd-bridge"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "ds41rt-ffi",
+ "ds41rt-transport",
+ "serde",
+ "serde_json",
+ "tokio",
+]
+
+[[package]]
 name = "ds41rt-api"
 version = "0.1.0"
 dependencies = [
