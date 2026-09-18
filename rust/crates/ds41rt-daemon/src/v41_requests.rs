@@ -102,6 +102,9 @@ impl<'a> Requests<'a> {
     pub fn cache(&self) -> &BackboneCache<'a> {
         &self.cache
     }
+    pub(crate) fn bind_executor_owner(&mut self, owner: u64) -> Result<()> {
+        self.cache.bind_executor_owner(owner)
+    }
     fn request(&self, lease: CacheLease) -> Result<&Request> {
         self.cache.request_id(lease)?;
         self.slots

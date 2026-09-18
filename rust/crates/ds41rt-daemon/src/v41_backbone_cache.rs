@@ -923,6 +923,15 @@ mod context_geometry_tests {
 }
 
 impl<'a> BackboneCache<'a> {
+    /// Library executor incarnation binding before any request or prefix
+    /// exists. The caller mints a nonzero owner that cannot repeat on restart.
+    pub(crate) fn bind_executor_owner(&mut self, owner: u64) -> Result<()> {
+        self.healthy()?;
+        ensure!(owner != 0 && self.generations.iter().all(|&g| g == 0)
+            && self.requests.iter().all(Option::is_none), "cache owner already in use");
+        self.owner = owner;
+        Ok(())
+    }
     pub fn owner(&self) -> u64 {
         self.owner
     }

@@ -1,0 +1,137 @@
+# Scoped retained target backend
+
+This packet makes the retained native target callable from the Rust library,
+without starting its HTTP server or replacing vLLM scheduling and sampling.
+Serving integration remains disabled. CPU ownership tests pass; model loading,
+GPU execution, numerical parity and performance have not been run for this seam.
+
+`native_executor::target::with_target(config, callback)` loads the native library
+and coordinator weights using the original one-RTX constructor, then supplies
+two real `TargetPass` / `NativeTp4Wave` contexts and one `Requests` owner. The
+native CLI calls that same extracted `v41_native_serve::with_components`
+constructor. Its weight-loading, workspace sizing, memory planning and native
+kernel/transport implementations have not been copied or replaced.
+
+All native owners stay on the constructing thread's stack for the callback's
+duration. Higher-ranked callback lifetimes prevent returning a context, bank or
+logits borrow after its weights/library have been destroyed. The `Rc` ownership
+prevents moving this scope to another thread. Two execution futures can progress
+on its current-thread Tokio runtime without holding a mutable bank borrow across
+expert/network waits; this uses retained `TargetPass::execute_shared` directly.
+
+The caller must delegate vLLM's physical coordinator-weight and KV allocation
+before invoking this factory. The factory is the sole allocator for that native
+model instance. It does not attach to existing PyTorch weights or allow vLLM to
+allocate another physical KV bank. Its startup allocations are the retained
+weights, two context workspaces, two transports, Engram staging and native cache;
+the retained constructor also includes the original vision workspace. These
+allocations are planned before KV sizing. The explicit target configuration
+disables local routed layers, dSpark and prefix/snapshot retention for this first
+binding; those are not yet integrated through this interface.
+
+## Callable contract
+
+`TargetConfig` contains an externally minted nonzero `owner` incarnation nonce,
+snapshot and native-library paths, four peer addresses, requested `batch_tokens`,
+`max_context_tokens`, request `slots` and explicit `cache_bytes`. The nonce must
+not repeat across worker restarts. The actual BackboneCache owner is bound to
+this nonce before its first admission, so native request leases and the future
+schema-1 command envelope can share the same owner identity. The CLI's existing
+automatic owner allocation is unchanged.
+
+Capacity uses the original constructor's AOT rounding (80 requested rows require
+capacity 256 because the retained encoder suffix reservation covers 128 rows).
+The compact vocabulary head has capacity 48 in this target-only configuration.
+Request tokens and selected rows remain owned until publication or cancellation.
+
+| API | Contract |
+| --- | --- |
+| `target.bank().admit(slot, request_id)` | Calls actual `Requests::admit`, returning its native `{owner, slot, generation}` lease. |
+| `target.split()` | Returns the current-thread runtime, bank handle and two distinct mutable contexts. |
+| `context.submit(TargetInput)` | Claims one request/context lease before preparing; owns tokens, strictly increasing selected row indices, source kind and expert-placement identity. Returns `Ticket {request, lane, id}`. |
+| `context.execute(ticket).await` | Calls retained full target execution. Incomplete/failed futures publish neither a result nor committed cache extent. |
+| `context.logits(ticket)` | Borrows the real compact FP32 device logits and selected row/position metadata. No logits allocation or host copy. |
+| `context.download_logits(ticket, rows).await` | Explicit diagnostic D2H copy through the retained downloader; indices address compact output rows. |
+| `context.commit(ticket, accepted)` | After logits consumers drain, calls actual `TargetPass::commit` → `Requests::commit` → native window/source/Engram publication; returns authoritative committed extent. Errors poison the integration scope. |
+| `context.cancel(ticket)` | After dropping its execution future/output borrows, synchronizes transport, aborts any queued cache publication and discards native private work before releasing the scheduling lease. |
+| `bank.release(request)` | Refuses live target batches/readers and delegates native request release, preserving generation validation. |
+| `bank.committed_end(request)` / `bank.info()` | Reads actual native cache extent, actual source capacities/free credits, and the constructor's physical byte plan. |
+
+`Logits::device_buffer()` is unsafe because a raw CUDA descriptor cannot express
+the external stream's lifetime in Rust. Its caller must retain the logits lease
+until every external asynchronous consumer drains. Normal Rust callers cannot
+commit, cancel or reuse that context while holding its logits borrow. Another
+context can still finish and publish a different request. Dropping a context
+cancels and drains its remaining batch. Dropping an execution future alone keeps
+the batch claimed until explicit cancellation or context drop; it cannot be
+silently reused.
+
+The bank attachment is executable: `NativeBank` borrows the actual `Requests`,
+whose `BackboneCache` owns real `SourceCache` allocations and the canonical
+`SourcePages`. It owns no alternate page table, free list, committed positions or
+prefix dictionary. Only the two scheduling tickets are tracked outside the bank.
+Never construct the schema-1 `CacheCommands` metadata prototype beside it.
+
+Full target execution is the current bound. Overlapping chunks of one prompt,
+encoder streaming, decoder-suffix replay, prefix snapshots, image inputs and
+dSpark transactions still need typed work descriptors and retained executor
+bindings. This interface rejects an encoder/replay-stage request rather than
+pretending a full-target call implements that path. No native sampler is exposed;
+the final vLLM adapter must consume logits using its existing sampling semantics.
+
+## Remaining dynamic binding
+
+Use the existing bridge's opaque handle registry and owned command channels for
+a dependency-free C ABI. A dedicated CUDA thread enters `with_target` and runs
+the command loop inside its callback. It may pin each of two execution futures
+locally, polling commands/completions on the existing current-thread runtime;
+the futures must never be made `Send`, self-referential or leaked to `'static`.
+
+The external interface still needs create/init reply, owned-token submit,
+bounded wait/poll, result-lease acquisition/release, accepted publication,
+cancel/drain and close. An exported logits pointer must retain its context until
+an explicitly retained consumer CUDA event proves the external read completed.
+Close/cancel cannot free an outstanding result lease merely because the Python
+caller returned or a timer elapsed. Exact handles must include the executor
+incarnation and ticket generation; errors cannot consume unrelated requests.
+
+The schema-1 handler then needs to route accepted publication to these actual
+target contexts and build ACK snapshots from the real bank. Its `Begin(rows)`
+command alone is insufficient to execute a model: the binding must also supply
+owned tokens, source kind, selected logits rows and phase. Source-only prefix
+references must continue to be excluded from complete model cache-hit reporting.
+No C ABI, JSON-to-target handler, vLLM physical-cache delegation or serving
+selection is implemented by this packet.
+
+## CPU proof
+
+The target suite uses the same `TargetContext` lifecycle as the native driver,
+with only device computation/transport completion replaced. Its fake physical
+rows use retained `SourcePages::reserve/destination/apply`, `SourcePrefix`, COW
+tail copies, page references and generations. Tests prove independent lane
+progress, borrowed-output request retention, exact accepted extent, failure
+without publication, canceled-future drain before reuse, stale/foreign tickets,
+owned inputs, admission before preparation, shared-tail preservation and
+physical page credits returning only after the final prefix reader drops.
+
+Three compile-fail tests prove same-context mutation cannot invalidate borrowed
+logits, a native scope cannot escape its constructor, and it cannot become Send.
+An external-crate `no_run` example also compiles a complete two-request
+submit/execute/borrow/commit/release sequence. It is never run on the CPU host.
+The constructor also rejects invalid geometry before loading any native library.
+These are CPU ownership/contract proofs, not GPU or throughput measurements.
+
+Validation: 25 unit cases passed across the target and schema-1 command suites,
+plus the existing constructor capacity regression. Four rustdoc checks passed
+(three intentional compile failures and one positive external consumer). The
+library and CLI pass offline checks and the development-profile library builds
+against the existing lockfile; no dependency or lockfile changes are included.
+
+```sh
+cd rust
+cargo check --offline -p ds41rt-daemon --lib --bins
+cargo build --offline -p ds41rt-daemon --lib
+cargo test --offline -p ds41rt-daemon --lib native_executor::
+cargo test --offline -p ds41rt-daemon --doc native_executor::target
+cargo test --offline -p ds41rt-daemon --lib prefill_capacity_tests
+```

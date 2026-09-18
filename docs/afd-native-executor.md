@@ -1,7 +1,7 @@
 # Native executor command seam (Packet A, schema 1)
 
-This is a disabled integration component. It does not load weights, allocate GPU
-KV, launch an executor or start a server. The daemon's existing module tree is
+This is a disabled integration component. The schema-1 command owner does not
+load weights, allocate GPU KV, launch an executor or start a server. The daemon's existing module tree is
 now a reusable Rust library; its CLI still calls the same command dispatcher.
 `native_executor` exposes the ownership/publication seam. The real native
 SourceCache and this seam use one canonical SourcePages implementation extracted
@@ -15,7 +15,10 @@ retry of the most recent successful envelope returns the same acknowledgement
 without replaying mutation. Older commands, changed retries, wrong owners and
 stale epochs fail without mutation. The sender must serialize commands or
 resynchronize from the last acknowledgement. This is a typed Rust/serde schema,
-not a new network transport or a stable C ABI yet.
+not a new network transport or a stable C ABI yet. The subsequent
+[scoped target backend](afd-native-target.md) can explicitly construct and call
+the retained model against its actual cache bank; it does not select a serving
+backend or connect this JSON schema to that bank automatically.
 
 The serde command encoding uses an `op` tag, for example:
 
@@ -70,10 +73,13 @@ weights, execution scratch and snapshots separately before vLLM reserves VRAM.
 Current construction is metadata-only and cannot be selected by the serving
 launcher. Sampling and kernel behavior are unchanged.
 
-Future attachment must move or borrow the canonical SourcePages already owned
-by the live SourceCache; constructing this metadata owner beside an independent
-live bank would violate the one-ledger contract. No such attachment is present
-yet. The generic device completion boundary and reader storage leases avoid
+Live attachment must borrow the canonical bank already owning SourcePages;
+constructing this metadata owner beside an independent live bank would violate
+the one-ledger contract. `native_executor::target::NativeBank` now attaches
+directly to retained Requests/BackboneCache and delegates actual publication to
+TargetPass. `CacheCommands::new` remains a metadata-only contract harness, and
+must not be constructed alongside that live target. The generic device
+completion boundary and reader storage leases avoid
 `'static` leaks or self-referential owners; its Rc-based ownership stays on the
 native computing thread.
 

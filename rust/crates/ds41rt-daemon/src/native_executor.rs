@@ -1,5 +1,6 @@
-//! Disabled native executor integration seam. No model/server/GPU factory is exposed.
+//! Disabled native executor integration seam. Nothing starts at import time.
 //! Physical source ownership is the same SourcePages used by native SourceCache.
+pub mod target;
 use anyhow::{ensure, Context, Result};
 use serde::{Deserialize, Serialize};
 use std::{cell::Cell, collections::BTreeMap, rc::Rc};

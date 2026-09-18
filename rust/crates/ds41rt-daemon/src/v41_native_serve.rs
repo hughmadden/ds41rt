@@ -123,6 +123,38 @@ fn worker(
     stats: std::sync::Arc<std::sync::Mutex<serde_json::Value>>,
 ) -> Result<()> {
     if args.rtx_gpus == 2 { return distributed::worker(args, receive, ready, stats); }
+    with_components(&args, |parts| {
+        ready.take().context("startup readiness missing")?.send(Ok(()))
+            .map_err(|_| anyhow::anyhow!("API startup cancelled"))?;
+        scheduler::serve(parts.lib, &args, parts.runtime, &mut receive,
+            parts.pass, parts.prefill_pass, parts.requests, parts.transport,
+            parts.prefill_transport, parts.draft, parts.vision, stats)
+    })
+}
+
+/// Borrowed only inside the construction scope: weights and library stay on
+/// this CUDA owner's stack, and both passes share exactly one request bank.
+pub(crate) struct TargetComponents<'s, 'w, 'd, 'a> {
+    pub lib: &'a NativeLibrary,
+    pub runtime: &'s tokio::runtime::Runtime,
+    pub pass: &'s mut TargetPass<'w, 'a>,
+    pub prefill_pass: &'s mut TargetPass<'w, 'a>,
+    pub requests: &'s mut Requests<'a>,
+    pub transport: &'s mut NativeTp4Wave<'a>,
+    pub prefill_transport: &'s mut NativeTp4Wave<'a>,
+    pub draft: Option<&'s mut DraftRuntime<'d, 'a>>,
+    pub vision: &'s mut crate::v41_vision::VisionRuntime<'a>,
+    pub capacity: u32,
+    pub source_pages: [usize; 4],
+    pub cache_bytes: usize,
+}
+
+/// The sole one-RTX constructor, reused by the CLI and the disabled library
+/// integration. No HTTP listener or request scheduler is started here.
+pub(crate) fn with_components<R>(args: &crate::cli::NativeServeArgs,
+    use_target: impl for<'s, 'w, 'd, 'a> FnOnce(TargetComponents<'s, 'w, 'd, 'a>) -> Result<R>,
+) -> Result<R> {
+    ensure!(args.rtx_gpus == 1, "library target requires one RTX");
     let capacity = prefill_capacity(args.prefill_batch_tokens)?;
     let rows = capacity as usize;
     let lib = unsafe { NativeLibrary::load(&args.native_lib)? };
@@ -330,13 +362,11 @@ fn worker(
     let runtime = tokio::runtime::Builder::new_current_thread()
         .enable_all()
         .build()?;
-    ready
-        .take()
-        .context("startup readiness missing")?
-        .send(Ok(()))
-        .map_err(|_| anyhow::anyhow!("API startup cancelled"))?;
-    scheduler::serve(&lib, &args, &runtime, &mut receive, &mut pass, &mut prefill_pass,
-        &mut requests, &mut transport, &mut prefill_transport, draft.as_mut(), &mut vision, stats)
+    use_target(TargetComponents { lib: &lib, runtime: &runtime, pass: &mut pass,
+        prefill_pass: &mut prefill_pass, requests: &mut requests,
+        transport: &mut transport, prefill_transport: &mut prefill_transport,
+        draft: draft.as_mut(), vision: &mut vision, capacity,
+        source_pages: pool.pages, cache_bytes: pool.cache_bytes })
 }
 
 /// The HC-9 prefill pacing hold at a chunk boundary: bounded by the host cache's store
