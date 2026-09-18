@@ -135,3 +135,49 @@ cargo test --offline -p ds41rt-daemon --lib native_executor::
 cargo test --offline -p ds41rt-daemon --doc native_executor::target
 cargo test --offline -p ds41rt-daemon --lib prefill_capacity_tests
 ```
+
+## Standalone first-GPU smoke
+
+`examples/native_target_probe.rs` calls this library directly. It starts no
+server and contains no PyTorch model. Its default token IDs are the campaign's
+thinking=false tokenize result for `Reply with exactly: APPLE`:
+`[0,128803,19905,418,9045,28,56684,4392,128804,128822]`. Tokenization is external
+to the target backend; the probe neither guesses a template nor invokes a new
+tokenizer.
+
+```sh
+cd rust
+cargo test --offline -p ds41rt-daemon --example native_target_probe
+cargo build --offline -p ds41rt-daemon --example native_target_probe
+target/debug/examples/native_target_probe \
+  --snapshot "$NATIVE_TARGET_SNAPSHOT" \
+  --native-lib "$NATIVE_TARGET_LIBRARY" \
+  --peers "$NATIVE_TARGET_FOUR_PEERS" \
+  --owner "$NATIVE_TARGET_FRESH_OWNER" \
+  --cache-bytes 536870912 --batch-tokens 80 --steps 1
+```
+
+Only the final command loads the model or touches expert peers. Run it in the
+parent-scheduled fleet window after releasing the coordinator GPU and confirming
+the retained native library and expert-worker artifacts. Build/run provenance
+must record this source SHA, build profile, native-library hashes and worker
+identities. The current local artifact is a development-profile correctness
+probe; its observed times must not be used as a throughput qualification.
+
+Stdout is flushed JSON lines: `start`, `initialized`, `logits`, `published`, and
+`complete`; native diagnostics go to stderr. Two distinct requests execute on
+the two retained contexts. The probe checks non-aliased device-logit buffers,
+selected row/position bindings, finite full-vocabulary FP32 rows, matching greedy
+token IDs, authoritative accepted positions, stale leases after release, and
+restored actual native source-page credits. It reports each output SHA256 and
+inter-context relative L2/max error; bitwise equality is reported, not assumed.
+Host diagnostic argmax is only a smoke oracle and is not installed as a serving
+sampler. A differing greedy token fails before accepted publication.
+
+`--steps 2` through `16` add bounded one-token decode forwards using the previous
+host argmax token. `--cancel-ready` cancels the second request's last completed
+batch after logits inspection, proving no accepted advancement for that batch
+while the first request still publishes. Both requests are then released and
+their source credits checked. Default execution is one prefill forward, with no
+warmup or graph-performance claim. The two example tests check host-logit
+geometry/finiteness/tie handling and exact default token/step bounds on CPU.
