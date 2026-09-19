@@ -3,7 +3,7 @@
 This diagnostic branch extends the opt-in target activation trace. Set
 `DS41RT_ACTIVATION_TRACE_DIR`, `DS41RT_ACTIVATION_TRACE_POSITION=10` and
 `DS41RT_ACTIVATION_TRACE_DETAIL_LAYER=2` to capture the selected layer for batches
-whose first native input position is 10. The existing owner-thread subscriber
+containing any native member input at position 10. The existing owner-thread subscriber
 activates only when a trace directory is supplied. Use a fresh directory for each
 process; every binary/manifest uses `create_new` and refuses replacement.
 
@@ -77,3 +77,36 @@ the legacy name is kept when the lane is unknown.
 Model, transport, kernel selection, and scratch geometry are untouched by these
 diagnostics; the WO-B capacity-16 probe remains a separate branch and is not
 part of this port.
+
+## Completed FFN diagnostics — 19 September 2026 AEST
+
+The same position and detail-layer selection now follows `PreparedLayer` into
+its actual TP4 FFN dispatch and pending reduction owner. All constructors default
+to no selection, and the transport wave retains no trace path across requests.
+Only the selected layer copies completed live rows, before owners are released.
+No kernel, wire format, reduction order or serving default changes.
+
+For selected layer1, additional buffers are:
+
+| Suffix after `layer1-` | Live row contents |
+| --- | --- |
+| `ffn-router-ids.bin` | Six uint32 expert IDs |
+| `ffn-router-routing.bin` | Six FP32 routing weights |
+| `ffn-router-expert-input.bin` | 5120 E4M3 values +160 UE8M0 scale bytes (5280 bytes) |
+| `ffn-shared.bin` | Completed local shared contribution, 5120 BF16 |
+| `ffn-plane-rank0.bin` through `ffn-plane-rank3.bin` | Actual received rank partials, each 5120 BF16 |
+| `ffn-reduced-output.bin` | Completed shared+routed result before final mHC, 5120 BF16 |
+
+`ffn-router.json`, `ffn-shared.json` and `ffn-reduction.json` record dtype,
+shape, row stride and exact live bytes. The packed FP8 expert input's shape
+counts logical values; its row stride additionally includes the scale bytes.
+`ffn-routes.json` preserves the existing CPU request routes and each flattened
+row's request ID, position and source kind. Join these identities to members.json;
+never infer physical bank slots from the member ordinal. Partial row stride
+comes from `V41_PARTIAL_ROW_BYTES`, not an assumed FP32 expert-slot layout.
+
+Pure CPU checks reject zero rows, overflow and capacity overruns, and validate
+selection and manifest extents. The existing native executor tests cover grouped
+consumer/commit/cancel ownership. These diagnostics synchronize D2H reads: full
+logit hashes must still match the untraced replay before using the captures, and
+traced timings must not be used for performance comparisons.

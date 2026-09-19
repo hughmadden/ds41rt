@@ -223,6 +223,7 @@ impl<'w, 'a> DistributedExecution<'w, 'a> {
                 produced_us: produced.producer_us,
                 indexed_us,
                 attended_us: indexed_us,
+                ffn_trace: crate::v41_backbone_lane::FfnTraceSelection::none(),
             }),
         })
     }

@@ -477,6 +477,12 @@ impl<'w, 'a> TargetPass<'w, 'a> {
                 let prepared = if let Some((directory, weights_directory)) = detail_trace {
                     prepared.trace_input(directory, weights_directory).await?
                 } else { prepared };
+                // Extend the same explicit selection (TRACE_POSITION + DETAIL_LAYER)
+                // through the FFN: router outputs, shared contribution, remote
+                // partial planes and reduction output. Non-selected layers and
+                // every ordinary pass keep the exact `None` default.
+                let prepared = prepared.with_ffn_trace(
+                    detail_trace.map(|(directory, _)| directory.as_path()));
                 let completed = prepared.execute(transport, placement, guard.batch.image_mask()).await?;
                 if cooperative {
                     self.execution.complete_layer_cooperative(guard.batch.cache()?, &mut self.lane, completed).await?;

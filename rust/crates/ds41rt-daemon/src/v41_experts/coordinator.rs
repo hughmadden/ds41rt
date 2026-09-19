@@ -171,13 +171,16 @@ impl<'a> NativeTp4Wave<'a> {
             self.shared.buffer,
             self.transport.capacity(),
         )?;
-        unsafe { self.dispatch_ffn(request).await?.finish(shared).await }
+        unsafe { self.dispatch_ffn(request, None).await?.finish(shared).await }
     }
     /// Enqueue all four expert requests before returning. The caller can then run
     /// shared FFN work on RTX while the Spark workers execute the routed experts.
+    /// `trace` is the explicitly selected detail-trace directory; the wave never
+    /// retains it, only the returned pending owner does, through completion.
     pub async fn dispatch_ffn<'w, 'r>(
         &'w mut self,
         request: &'r crate::v41_backbone_router::BoundExpertRequest,
+        trace: Option<std::path::PathBuf>,
     ) -> Result<NativePendingFfn<'w, 'a, 'r>> {
         self.ready_rows = None;
         // Previous output or cancellation cleanup completed this wave.
@@ -204,6 +207,7 @@ impl<'a> NativeTp4Wave<'a> {
             reducer: &self.reducer,
             ready_rows: &mut self.ready_rows,
             tp2: self.tp2.as_deref_mut(),
+            trace,
         })
     }
 
@@ -375,6 +379,11 @@ async unsafe fn reduce_planes_cooperative(reducer: &V41CompactReducer<'_>,
     launched.and(drained)
 }
 
+/// Trace file names for the four ordered reducer input planes.
+const PLANE_TRACE_NAMES: [&str; 4] = [
+    "ffn-plane-rank0", "ffn-plane-rank1", "ffn-plane-rank2", "ffn-plane-rank3",
+];
+
 /// Borrows every mutable reduction buffer and owns all unread response sockets.
 /// Dropping before completion leaves the wave unpublished and closes the sockets.
 pub(crate) struct NativePendingFfn<'w, 'a, 'r> {
@@ -390,6 +399,9 @@ pub(crate) struct NativePendingFfn<'w, 'a, 'r> {
     reducer: &'w V41CompactReducer<'a>,
     ready_rows: &'w mut Option<u32>,
     tp2: Option<&'w mut super::tp2_ffn::Wave<'a>>,
+    /// Owned selected-trace directory; consumed on the successful completion
+    /// path only, never retained past this owner.
+    trace: Option<std::path::PathBuf>,
 }
 impl<'w> NativePendingFfn<'w, '_, '_> {
     /// # Safety
@@ -463,6 +475,35 @@ impl<'w> NativePendingFfn<'w, '_, '_> {
         }
         uploads.pending = false; // uploads and reduction completed on the same stream.
         tracing::debug!(target: "ds41rt::timing", layer=self.request.request().header.layer_id, rows, shared_copy_us, upload_us, receive_us=received_us-shared_copy_us-upload_us, reduce_us=timing.elapsed().as_micros() as u64-received_us, "target collection");
+        // The four uploaded rank partials and the reduced output are complete
+        // and still owned here; capture them before the borrowed result view
+        // is released to the caller. Plane layout is the reducer's own BF16
+        // row stride, never an assumed plane count or dtype.
+        if let Some(directory) = &self.trace {
+            let layer = self.request.request().header.layer_id as usize;
+            let row_bytes = V41_PARTIAL_ROW_BYTES as usize;
+            let mut sources = Vec::with_capacity(5);
+            for rank in 0..4 {
+                sources.push(crate::v41_backbone_lane::FfnTraceSource {
+                    name: PLANE_TRACE_NAMES[rank],
+                    dtype: "bfloat16",
+                    values_per_row: row_bytes / 2,
+                    row_bytes,
+                    buffer: self.planes[rank].buffer,
+                });
+            }
+            sources.push(crate::v41_backbone_lane::FfnTraceSource {
+                name: "ffn-reduced-output",
+                dtype: "bfloat16",
+                values_per_row: row_bytes / 2,
+                row_bytes,
+                buffer: self.output,
+            });
+            let entries = crate::v41_backbone_lane::trace_ffn_buffers(
+                self.library, directory, layer, rows, &sources)?;
+            crate::v41_backbone_lane::write_ffn_trace_manifest(
+                directory, layer, rows, "ffn-reduction", &entries)?;
+        }
         *self.ready_rows = Some(rows);
         let mut values = self.output;
         values.bytes = rows as usize * 10240;
@@ -471,6 +512,57 @@ impl<'w> NativePendingFfn<'w, '_, '_> {
             binding: self.request.binding(),
             _owner: std::marker::PhantomData,
         })
+    }
+}
+
+#[cfg(test)]
+mod ffn_trace_tests {
+    use super::*;
+
+    fn fake_buffer(bytes: usize) -> Ds41rtDeviceBuffer {
+        Ds41rtDeviceBuffer { bytes, ..Default::default() }
+    }
+
+    #[test]
+    fn reduction_trace_plan_uses_true_partial_row_layout() {
+        // V41_PARTIAL_ROW_BYTES = V41_HIDDEN * 2 = 10240: each reducer input
+        // plane row is 5120 BF16 values, the same geometry as the shared
+        // contribution and the reduced output. Never assume a plane count or
+        // dtype from outside these constants.
+        let row_bytes = V41_PARTIAL_ROW_BYTES as usize;
+        assert_eq!(row_bytes, 10240);
+        let capacity = 80usize;
+        let sources: Vec<crate::v41_backbone_lane::FfnTraceSource> = (0..4)
+            .map(|rank| crate::v41_backbone_lane::FfnTraceSource {
+                name: PLANE_TRACE_NAMES[rank as usize],
+                dtype: "bfloat16",
+                values_per_row: row_bytes / 2,
+                row_bytes,
+                buffer: fake_buffer(capacity * row_bytes),
+            })
+            .chain(std::iter::once(crate::v41_backbone_lane::FfnTraceSource {
+                name: "ffn-reduced-output",
+                dtype: "bfloat16",
+                values_per_row: row_bytes / 2,
+                row_bytes,
+                buffer: fake_buffer(capacity * row_bytes),
+            }))
+            .collect();
+        assert_eq!(sources.len(), 5);
+        let entries = crate::v41_backbone_lane::plan_ffn_trace(1, 42, &sources).unwrap();
+        assert_eq!(entries.len(), 5);
+        for entry in &entries {
+            assert_eq!(entry.row_bytes, 10240);
+            assert_eq!(entry.shape, [42, 5120]);
+            assert_eq!(entry.bytes, 42 * 10240);
+            assert_eq!(entry.bytes, entry.shape[0] * entry.row_bytes);
+        }
+        // Four planes plus the reduced output, all bounded by live capacity.
+        assert!(crate::v41_backbone_lane::plan_ffn_trace(1, 81, &sources).is_err());
+        // Unique names: rank planes and the output cannot overwrite each other.
+        let unique: std::collections::HashSet<_> =
+            entries.iter().map(|e| e.file.clone()).collect();
+        assert_eq!(unique.len(), entries.len());
     }
 }
 

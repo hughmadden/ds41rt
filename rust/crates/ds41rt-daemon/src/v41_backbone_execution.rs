@@ -33,6 +33,8 @@ pub(crate) struct PreparedLayer<'l, 'w, 'a> {
     produced_us: u64,
     indexed_us: u64,
     attended_us: u64,
+    /// Opt-in selected-layer FFN trace directory; `None` is the exact default.
+    ffn_trace: crate::v41_backbone_lane::FfnTraceSelection,
 }
 pub(crate) struct CompletedLayer<'t> {
     result: NativeFfnOutput<'t>,
@@ -70,6 +72,16 @@ impl CompletedLayer<'_> {
     }
 }
 impl PreparedLayer<'_, '_, '_> {
+    /// Opt-in selected-layer FFN trace: capture the completed router outputs,
+    /// shared contribution, remote partial planes and reduction output for this
+    /// layer only. `None` (the default) keeps serving behavior exact.
+    pub fn with_ffn_trace(mut self, trace: Option<&std::path::Path>) -> Self {
+        self.ffn_trace = match trace {
+            Some(directory) => crate::v41_backbone_lane::FfnTraceSelection::selected(directory),
+            None => crate::v41_backbone_lane::FfnTraceSelection::none(),
+        };
+        self
+    }
     pub async fn trace_input(mut self, directory: &std::path::Path, weights_directory: &std::path::Path) -> Result<Self> {
         let ffn = match self.ffn {
             PreparedFfn::Ready(ffn) => { ffn.trace_projection(directory, weights_directory)?; ffn },
@@ -128,7 +140,8 @@ impl PreparedLayer<'_, '_, '_> {
         let routed_backend = if transport.has_tp2_layer(self.layer) { "rtx_tp2" }
             else if transport.has_local_layer(self.layer) { "rtx_local" } else { "spark_tp4" };
         let shared_tp = if transport.has_tp2_shared_layer(self.layer) { 2 } else { 1 };
-        let result = unsafe { ffn.execute_tp4(transport, placement, image_mask, &self.rows).await? };
+        let result = unsafe { ffn.execute_tp4(transport, placement, image_mask, &self.rows,
+            self.ffn_trace.directory()).await? };
         Ok(CompletedLayer { result, batch: self.batch, layer: self.layer, rows: self.rows.len(),
             routed_backend, shared_tp,
             started: self.started, produced_us: self.produced_us, indexed_us: self.indexed_us,
@@ -570,7 +583,8 @@ impl<'w, 'a> BackboneExecution<'w, 'a> {
             bank.publish_encoder_window(batch, layer, &mut self.windows[layer])?;
         }
         Ok(PreparedLayer { ffn, rows, batch: batch.identity(), layer, started: timing,
-            produced_us, indexed_us, attended_us: timing.elapsed().as_micros() as u64 })
+            produced_us, indexed_us, attended_us: timing.elapsed().as_micros() as u64,
+            ffn_trace: crate::v41_backbone_lane::FfnTraceSelection::none() })
     }
     /// # Safety
     /// The completed transport output and lane belong to this prepared layer;

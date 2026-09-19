@@ -234,12 +234,15 @@ impl LaneFfn<'_, '_, '_> {
     /// # Safety
     /// Metadata and mask identify the actual requests/modality in input order.
     /// All external producers are complete and no writes race this lane.
+    /// `trace_directory` is the explicitly selected detail-trace directory; it
+    /// is honored only on the actual TP4 path and consumed by this call.
     pub async unsafe fn execute_tp4<'t>(
         &mut self,
         transport: &'t mut NativeTp4Wave<'_>,
         placement: u64,
         image_mask: &[u8],
         rows: &[ExpertRow],
+        trace_directory: Option<&std::path::Path>,
     ) -> Result<NativeFfnOutput<'t>> {
         let cooperative = self.cooperative;
         let input = &self.input;
@@ -252,6 +255,29 @@ impl LaneFfn<'_, '_, '_> {
             router.set_local_mode(transport.has_local_layer(input.layer))?;
             let routed = unsafe { if cooperative { router.execute_ffn_cooperative(input, image_mask).await? }
                 else { router.execute_ffn(input, image_mask)? } };
+            // The selected trace supports the actual TP4 path only; refuse
+            // explicitly instead of inventing partial outputs for other routing.
+            if let Some(directory) = trace_directory {
+                ensure!(
+                    !transport.has_local_layer(input.layer)
+                        && !transport.has_tp2_shared_layer(input.layer),
+                    "selected FFN trace requires the actual TP4 path; layer {} routing is unsupported",
+                    input.layer
+                );
+                // Completed router outputs, before dispatch and in existing
+                // request/transport order; live rows only, no recomputation.
+                // Per-row strides are the router wave's own output geometry
+                // (6 route ids, 6 gate weights, 5280-byte quantized input).
+                let entries = trace_ffn_buffers(library, directory, input.layer, rows.len() as u32, &[
+                    FfnTraceSource { name: "ffn-router-ids", dtype: "uint32",
+                        values_per_row: 6, row_bytes: 24, buffer: routed.ids },
+                    FfnTraceSource { name: "ffn-router-routing", dtype: "float32",
+                        values_per_row: 6, row_bytes: 24, buffer: routed.routing },
+                    FfnTraceSource { name: "ffn-router-expert-input", dtype: "fp8e4m3ue8m0k32",
+                        values_per_row: 5120, row_bytes: 5280, buffer: routed.expert_input },
+                ])?;
+                write_ffn_trace_manifest(directory, input.layer, rows.len() as u32, "ffn-router", &entries)?;
+            }
             if transport.has_local_layer(input.layer) {
                 routed.validate_request_rows(rows)?;
                 let trace = tracing::enabled!(target: "ds41rt::route_policy", tracing::Level::DEBUG);
@@ -289,6 +315,11 @@ impl LaneFfn<'_, '_, '_> {
             let tp2_shared = transport.has_tp2_shared_layer(input.layer);
             ensure!(shared.is_some() || tp2_shared, "decoder shared TP2 execution required");
             let request = unsafe { routed.expert_request(library, placement, rows)? };
+            if let Some(directory) = trace_directory {
+                // Actual host request routes plus owner identity metadata, from
+                // the dispatch payload this execution already built.
+                write_ffn_routes_manifest(directory, input.layer, &request, rows)?;
+            }
             if let Some(capture) = route_capture.as_deref_mut() {
                 let output = &mut capture[input.layer];
                 output.clear();
@@ -296,7 +327,8 @@ impl LaneFfn<'_, '_, '_> {
                     .map(|routes| std::array::from_fn(|i| routes[i].expert_id)));
             }
             let routed_us = timing.elapsed().as_micros() as u64;
-            let pending = transport.dispatch_ffn(&request).await?;
+            let pending = transport.dispatch_ffn(&request,
+                trace_directory.map(std::path::Path::to_path_buf)).await?;
             let dispatched_us = timing.elapsed().as_micros() as u64;
             if tp2_shared {
                 let result = unsafe { pending.finish_tp2(input).await };
@@ -308,6 +340,15 @@ impl LaneFfn<'_, '_, '_> {
             let shared = shared.as_mut().context("decoder shared TP2 execution required")?;
             let contribution = unsafe { if cooperative { shared.execute_ffn_cooperative(input).await? }
                     else { shared.execute_ffn(input)? } };
+            if let Some(directory) = trace_directory {
+                // Completed local shared-expert contribution exactly as passed
+                // to the pending reducer, copied before the buffer is reused.
+                let entries = trace_ffn_buffers(library, directory, input.layer, contribution.rows, &[
+                    FfnTraceSource { name: "ffn-shared", dtype: "bfloat16",
+                        values_per_row: 5120, row_bytes: 10240, buffer: contribution.values },
+                ])?;
+                write_ffn_trace_manifest(directory, input.layer, contribution.rows, "ffn-shared", &entries)?;
+            }
             let shared_us = timing.elapsed().as_micros() as u64;
             let result = unsafe { if cooperative { pending.finish_cooperative(&contribution).await }
                 else { pending.finish(&contribution).await } }?;
@@ -772,10 +813,258 @@ pub(crate) fn trace_buffers(library: &NativeLibrary, directory: &std::path::Path
     Ok(())
 }
 
+/// One completed device buffer offered to the opt-in selected-layer FFN trace.
+/// `row_bytes` is the exact live per-row stride of the producer layout; the
+/// manifest's dtype/shape describe the packed contents for offline analysis.
+pub(crate) struct FfnTraceSource {
+    pub name: &'static str,
+    pub dtype: &'static str,
+    pub values_per_row: usize,
+    pub row_bytes: usize,
+    pub buffer: Ds41rtDeviceBuffer,
+}
+
+/// Manifest record for one dumped buffer. Every field is derived from the
+/// validated live extent, so the JSON always matches the raw file on disk.
+#[derive(Debug, serde::Serialize, PartialEq, Eq)]
+pub(crate) struct FfnTraceEntry {
+    pub name: String,
+    pub file: String,
+    pub dtype: String,
+    /// [rows, values_per_row] of the live extent actually written.
+    pub shape: [usize; 2],
+    /// First live row inside the source allocation; zero for full-row dumps.
+    pub row_offset: usize,
+    pub row_bytes: usize,
+    /// Live bytes written; always `shape[0] * row_bytes`.
+    pub bytes: usize,
+}
+
+/// Per-layer opt-in FFN trace selection carried by `PreparedLayer`. Pure by
+/// construction: default is `None`, the wave only ever sees an owned clone,
+/// so a traced request cannot leak selection into the next layer or request.
+#[derive(Default, Clone, Debug, PartialEq, Eq)]
+pub(crate) struct FfnTraceSelection {
+    directory: Option<std::path::PathBuf>,
+}
+impl FfnTraceSelection {
+    pub fn none() -> Self { Self { directory: None } }
+    pub fn selected(directory: &std::path::Path) -> Self {
+        Self { directory: Some(directory.to_path_buf()) }
+    }
+    pub fn directory(&self) -> Option<&std::path::Path> { self.directory.as_deref() }
+    /// Owned copy for the pending reduction owner; the transport wave itself
+    /// never retains the path.
+    #[cfg(test)]
+    pub fn owned_directory(&self) -> Option<std::path::PathBuf> { self.directory.clone() }
+}
+
+/// Validate live row extents without touching a device: reject zero rows,
+/// arithmetic overflow, and any extent past the allocation's live capacity.
+pub(crate) fn plan_ffn_trace(layer: usize, rows: u32, sources: &[FfnTraceSource])
+    -> Result<Vec<FfnTraceEntry>> {
+    ensure!(rows > 0, "FFN trace requires at least one live row");
+    sources.iter().map(|source| {
+        let rows = rows as usize;
+        let bytes = rows
+            .checked_mul(source.row_bytes)
+            .context("FFN trace live row extent overflow")?;
+        ensure!(
+            bytes <= source.buffer.bytes,
+            "FFN trace live rows exceed {} allocation", source.name
+        );
+        Ok(FfnTraceEntry {
+            name: source.name.into(),
+            file: format!("layer{layer}-{}.bin", source.name),
+            dtype: source.dtype.into(),
+            shape: [rows, source.values_per_row],
+            row_offset: 0,
+            row_bytes: source.row_bytes,
+            bytes,
+        })
+    }).collect()
+}
+
+/// Copy completed native buffers to bounded raw files (`create_new`, so a
+/// colliding dump fails loudly) trimmed to the validated live row extent; the
+/// allocation's unused capacity is never dumped.
+pub(crate) fn trace_ffn_buffers(library: &NativeLibrary, directory: &std::path::Path,
+    layer: usize, rows: u32, sources: &[FfnTraceSource]) -> Result<Vec<FfnTraceEntry>> {
+    use std::io::Write;
+    let entries = plan_ffn_trace(layer, rows, sources)?;
+    for (entry, source) in entries.iter().zip(sources) {
+        let mut file = std::fs::OpenOptions::new().write(true).create_new(true)
+            .open(directory.join(&entry.file))?;
+        let mut bytes = vec![0u8; entry.bytes];
+        library.copy_d2h(&mut bytes, Ds41rtDeviceBuffer { bytes: entry.bytes, ..source.buffer })?;
+        file.write_all(&bytes)?;
+    }
+    Ok(entries)
+}
+
+/// Write the JSON manifest beside the raw files; schema/offsets/row counts are
+/// exactly the validated entries, so tests can pin them to real extents.
+pub(crate) fn write_ffn_trace_manifest(directory: &std::path::Path,
+    layer: usize, rows: u32, label: &str, entries: &[FfnTraceEntry]) -> Result<()> {
+    let file = std::fs::OpenOptions::new().write(true).create_new(true)
+        .open(directory.join(format!("layer{layer}-{label}.json")))?;
+    serde_json::to_writer_pretty(file, &serde_json::json!({
+            "schema": 1,
+            "label": label,
+            "layer": layer,
+            "rows": rows,
+            "entries": entries,
+        })).context("writing FFN trace manifest")
+}
+
+/// Actual host request routes and owner identity for the selected trace. The
+/// routes are the already-built CPU dispatch payload (never recomputed), in
+/// transport order; owners follow the batch's flattened request order.
+fn write_ffn_routes_manifest(directory: &std::path::Path, layer: usize,
+    request: &crate::v41_backbone_router::BoundExpertRequest,
+    rows: &[ExpertRow]) -> Result<()> {
+    let protocol = request.request();
+    let header = &protocol.header;
+    ensure!(
+        header.row_count as usize == rows.len() && header.layer_id as usize == layer,
+        "FFN routes manifest request identity differs"
+    );
+    let routes: Vec<Vec<serde_json::Value>> = protocol.routes.chunks_exact(6)
+        .map(|route| route.iter().map(|entry| serde_json::json!({
+            "expert_id": entry.expert_id,
+            "gate_weight": entry.gate_weight,
+        })).collect())
+        .collect();
+    ensure!(routes.len() == rows.len(), "FFN routes manifest row count differs");
+    let owners: Vec<serde_json::Value> = rows.iter().map(|row| serde_json::json!({
+        "request_id": row.request_id,
+        "position": row.position,
+        "kind": format!("{:?}", row.kind),
+    })).collect();
+    let file = std::fs::OpenOptions::new().write(true).create_new(true)
+        .open(directory.join(format!("layer{layer}-ffn-routes.json")))?;
+    serde_json::to_writer_pretty(file, &serde_json::json!({
+            "schema": 1,
+            "layer": layer,
+            "rows": rows.len(),
+            "request_id": header.request_id,
+            "owners": owners,
+            "routes": routes,
+        })).context("writing FFN routes manifest")
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use ds41rt_loader::{read_official_v41_catalog, OFFICIAL_V41_MODEL_ID};
+
+    fn fake_trace_buffer(bytes: usize) -> Ds41rtDeviceBuffer {
+        // Extent planning is pure CPU: a null, device-less buffer is never
+        // read because only `bytes` participates in validation.
+        Ds41rtDeviceBuffer { bytes, ..Default::default() }
+    }
+
+    #[test]
+    fn ffn_trace_plan_rejects_zero_overflow_and_capacity() {
+        let row_bytes = 10240;
+        let capacity_rows = 80usize;
+        let sources = vec![FfnTraceSource { name: "ffn-shared", dtype: "bfloat16",
+            values_per_row: 5120, row_bytes, buffer: fake_trace_buffer(capacity_rows * row_bytes) }];
+        // Zero live rows never select.
+        assert!(plan_ffn_trace(1, 0, &sources).is_err());
+        // One row past the live capacity is rejected, not trimmed silently.
+        assert!(plan_ffn_trace(1, capacity_rows as u32 + 1, &sources).is_err());
+        // Exact capacity is accepted.
+        let entries = plan_ffn_trace(1, capacity_rows as u32, &sources).unwrap();
+        assert_eq!(entries[0].bytes, capacity_rows * row_bytes);
+        // A huge per-row stride overflows row arithmetic independently of rows.
+        let wide = vec![FfnTraceSource { name: "ffn-wide", dtype: "bytes",
+            values_per_row: 1, row_bytes: usize::MAX - 7, buffer: fake_trace_buffer(usize::MAX) }];
+        assert!(plan_ffn_trace(1, 2, &wide).is_err());
+        // Live trim: fewer rows dump fewer bytes, never the full allocation.
+        let entries = plan_ffn_trace(1, 42, &sources).unwrap();
+        assert_eq!(entries[0].bytes, 42 * row_bytes);
+        assert_eq!(entries[0].shape, [42, 5120]);
+        assert_eq!(entries[0].row_offset, 0);
+    }
+
+    #[test]
+    fn ffn_trace_plan_matches_router_output_geometry() {
+        // Per-row strides are the router wave's own output layout: 6 route
+        // ids (u32), 6 gate weights (f32), 5280-byte quantized expert input.
+        let capacity = 80usize;
+        let router = vec![
+            FfnTraceSource { name: "ffn-router-ids", dtype: "uint32",
+                values_per_row: 6, row_bytes: 24, buffer: fake_trace_buffer(capacity * 24) },
+            FfnTraceSource { name: "ffn-router-routing", dtype: "float32",
+                values_per_row: 6, row_bytes: 24, buffer: fake_trace_buffer(capacity * 24) },
+            FfnTraceSource { name: "ffn-router-expert-input", dtype: "fp8e4m3ue8m0k32",
+                values_per_row: 5120, row_bytes: 5280, buffer: fake_trace_buffer(capacity * 5280) },
+        ];
+        let entries = plan_ffn_trace(1, 42, &router).unwrap();
+        assert_eq!(entries.len(), 3);
+        assert_eq!(entries[0].bytes, 42 * 24);
+        assert_eq!(entries[0].shape, [42, 6]);
+        assert_eq!(entries[1].bytes, 42 * 24);
+        assert_eq!(entries[2].bytes, 42 * 5280);
+        assert_eq!(entries[2].shape, [42, 5120]);
+        // Distinct file names keep create_new from ever colliding.
+        let unique: std::collections::HashSet<_> = entries.iter().map(|e| e.file.clone()).collect();
+        assert_eq!(unique.len(), entries.len());
+    }
+
+    #[test]
+    fn ffn_trace_selection_defaults_none_and_propagates_explicitly() {
+        let default = FfnTraceSelection::default();
+        assert_eq!(default.directory(), None);
+        assert_eq!(default.owned_directory(), None);
+        let directory = std::path::Path::new("/trace/lane0-batch7-Full-80rows");
+        let selected = FfnTraceSelection::selected(directory);
+        assert_eq!(selected.directory(), Some(directory));
+        // Consumers (pending reducer owner) take an owned clone; the source
+        // selection and the transport wave retain nothing, so an explicit
+        // selection cannot leak into the next request.
+        let owned = selected.owned_directory().expect("explicit selection propagates");
+        assert_eq!(owned, directory);
+        assert_eq!(selected.directory(), Some(directory));
+        let _ = owned;
+        assert_eq!(FfnTraceSelection::none().directory(), None);
+    }
+
+    #[test]
+    fn ffn_trace_manifest_metadata_matches_planned_extents() -> Result<()> {
+        let directory = std::env::temp_dir()
+            .join(format!("ds41rt-ffn-trace-manifest-{}", std::process::id()));
+        std::fs::create_dir_all(&directory)?;
+        let sources = vec![
+            FfnTraceSource { name: "ffn-router-ids", dtype: "uint32",
+                values_per_row: 6, row_bytes: 24, buffer: fake_trace_buffer(80 * 24) },
+            FfnTraceSource { name: "ffn-shared", dtype: "bfloat16",
+                values_per_row: 5120, row_bytes: 10240, buffer: fake_trace_buffer(80 * 10240) },
+        ];
+        let entries = plan_ffn_trace(1, 7, &sources)?;
+        write_ffn_trace_manifest(&directory, 1, 7, "ffn-input", &entries)?;
+        let manifest: serde_json::Value =
+            serde_json::from_slice(&std::fs::read(directory.join("layer1-ffn-input.json"))?)?;
+        assert_eq!(manifest["schema"], 1);
+        assert_eq!(manifest["layer"], 1);
+        assert_eq!(manifest["rows"], 7);
+        assert_eq!(manifest["label"], "ffn-input");
+        for (index, entry) in entries.iter().enumerate() {
+            let recorded = &manifest["entries"][index];
+            assert_eq!(recorded["file"], entry.file);
+            assert_eq!(recorded["dtype"], entry.dtype);
+            assert_eq!(recorded["shape"], serde_json::json!(entry.shape));
+            assert_eq!(recorded["row_offset"], 0);
+            assert_eq!(recorded["row_bytes"], entry.row_bytes);
+            // Manifest row counts and byte totals match the validated live
+            // extents exactly: bytes == rows * row_bytes.
+            assert_eq!(recorded["bytes"], entry.bytes);
+            assert_eq!(entry.bytes, entry.shape[0] * entry.row_bytes);
+        }
+        std::fs::remove_dir_all(&directory)?;
+        Ok(())
+    }
 
     #[test]
     fn lane_ffn_cancellation_and_failure_do_not_publish_completion() {
