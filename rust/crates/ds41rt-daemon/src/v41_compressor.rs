@@ -285,10 +285,52 @@ impl<'a> CompressorWeights<'a> {
             trace_root: Default::default(),
         })
     }
-    pub fn wave(&self, rows: usize, budget: usize) -> Result<CompressorWave<'_, 'a>> {
-        // Capture the EXPERIMENTAL pad-rows policy once per wave: invalid config
-        // is rejected here, before any wave allocation happens.
-        let pad_rows = PadRowsPolicy::from_env()?;
+    /// Test-only constructor over separately allocated device storage, so CPU
+    /// stub-library tests can drive the real wave/execute path without the
+    /// model catalog. Allocation sizes match what the FFI validation of every
+    /// launched kernel requires for this layer's weights.
+    #[cfg(test)]
+    pub(crate) fn with_stub_tensors(
+        library: &'a NativeLibrary,
+        layer: usize,
+    ) -> Result<Self> {
+        let names = Self::names(layer)?;
+        let mut tensors = std::collections::BTreeMap::new();
+        for name in &names {
+            let bytes = if name.ends_with("compressor.wkv.weight")
+                || name.ends_with("compressor.wgate.weight")
+            {
+                512 * 10240
+            } else if name.ends_with("compressor.norm.weight") {
+                1024
+            } else {
+                128 * 512 * 2
+            };
+            tensors.insert(name.clone(), DeviceAllocation::new(library, bytes)?);
+        }
+        Ok(Self {
+            library,
+            tensors: NativeRtxTensors::from_allocations(tensors),
+            layer,
+            ratio: ratio(layer)?,
+            names,
+            trace_root: Default::default(),
+        })
+    }
+    /// Create one producer wave. The EXPERIMENTAL pad-rows policy is an
+    /// explicit argument so the caller's ONE captured value drives this wave's
+    /// budget check, buffer layout and stored policy together; this hot path
+    /// never reads the process environment. Invalid configuration is rejected
+    /// by the caller's capture (before any allocation), and selecting a pad
+    /// policy without the native pad-input export fails here, before any
+    /// enqueue. The off policy and every ratio-one wave keep the exact
+    /// historical allocation sizes and native call shapes.
+    pub fn wave(
+        &self,
+        rows: usize,
+        budget: usize,
+        pad_rows: PadRowsPolicy,
+    ) -> Result<CompressorWave<'_, 'a>> {
         ensure!(
             CompressorWave::device_bytes(self.layer, rows, pad_rows)? <= budget,
             "compressor wave exceeds budget"
@@ -1149,3 +1191,6 @@ impl<'a> CompressorState<'a> {
 #[cfg(test)]
 #[path = "v41_compressor/input_trace_tests.rs"]
 mod input_trace_tests;
+#[cfg(test)]
+#[path = "v41_compressor/pad_wave_tests.rs"]
+mod pad_wave_tests;

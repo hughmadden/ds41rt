@@ -250,12 +250,26 @@ impl<'w, 'a> PlacedProducerWaves<'w, 'a> {
         device.run(|| unsafe { index.get_mut().enqueue_projection(query) })?;
         Ok(pending)
     }
+    /// Read-only planning wrapper: captures the pad-rows policy from the
+    /// environment for this sizing invocation only. Constructors must instead
+    /// capture the policy once and use [`Self::device_bytes_with_policy`] so
+    /// their budget and the created waves share one policy value.
     pub fn device_bytes(
         library: &NativeLibrary,
         placement: CachePlacement,
         capacity: u32,
     ) -> Result<[usize; 2]> {
         let pad_rows = crate::v41_compressor::PadRowsPolicy::from_env()?;
+        Self::device_bytes_with_policy(library, placement, capacity, pad_rows)
+    }
+    /// Per-GPU budget computed from ONE explicitly captured pad-rows policy —
+    /// the same value the created waves will use for layout and allocation.
+    pub fn device_bytes_with_policy(
+        library: &NativeLibrary,
+        placement: CachePlacement,
+        capacity: u32,
+        pad_rows: crate::v41_compressor::PadRowsPolicy,
+    ) -> Result<[usize; 2]> {
         let mut bytes = [0usize; 2];
         let window = WindowWave::device_bytes(library, capacity)?;
         for layer in 0..40 {
@@ -284,8 +298,10 @@ impl<'w, 'a> PlacedProducerWaves<'w, 'a> {
         let placement = weights
             .placement
             .context("placed producer workspaces need a placement map")?;
+        // Capture the pad-rows policy ONCE, before any allocation: this value
+        // computes the budget below and is passed unchanged to every wave.
         let pad_rows = crate::v41_compressor::PadRowsPolicy::from_env()?;
-        let bytes = Self::device_bytes(weights.library, placement, capacity)?;
+        let bytes = Self::device_bytes_with_policy(weights.library, placement, capacity, pad_rows)?;
         ensure!(
             bytes
                 .into_iter()
@@ -314,6 +330,7 @@ impl<'w, 'a> PlacedProducerWaves<'w, 'a> {
                     weights.wave(
                         capacity as usize,
                         CompressorWave::device_bytes(layer, capacity as usize, pad_rows)?,
+                        pad_rows,
                     )
                 })
             })
@@ -593,8 +610,11 @@ mod tests {
             let mut reference_window = device
                 .own(|| weights.windows[layer].wave(16, WindowWave::device_bytes(&lib, 16)?))?;
             let mut reference_source = device.own(|| {
-                weights.sources[source_id]
-                    .wave(16, CompressorWave::device_bytes(layer, 16, pad_rows)?)
+                weights.sources[source_id].wave(
+                    16,
+                    CompressorWave::device_bytes(layer, 16, pad_rows)?,
+                    pad_rows,
+                )
             })?;
             let runtime = tokio::runtime::Builder::new_current_thread().build()?;
             for seed in [0, 7] {
@@ -836,8 +856,13 @@ mod tests {
             source_states[0].begin_request(0, 1)?,
             source_states[1].begin_request(0, 1)?,
         ];
-        let mut reference_compressor_wave = devices[0]
-            .own(|| reference_compressor.wave(16, CompressorWave::device_bytes(20, 16, pad_rows)?))?;
+        let mut reference_compressor_wave = devices[0].own(|| {
+            reference_compressor.wave(
+                16,
+                CompressorWave::device_bytes(20, 16, pad_rows)?,
+                pad_rows,
+            )
+        })?;
         let mut previous = None;
         for changed in [false, true] {
             let host: Vec<u8> = (0..16 * 5120)

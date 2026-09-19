@@ -28,7 +28,9 @@ fn placed_cache_commits_match_direct_and_preserve_peer_requests() -> Result<()> 
         PlacedProducerWaves::new(&weights,16,PlacedProducerWaves::device_bytes(&lib,placement,16)?)?];
     let mut rw = reference_weights.iter().map(|weights| weights.wave(16,WindowWave::device_bytes(&lib,16)?))
         .collect::<Result<Vec<_>>>()?;
-    let mut rs = reference_sources.iter().zip(SOURCES).map(|(weights,layer)| weights.wave(16,CompressorWave::device_bytes(layer,16,PadRowsPolicy::from_env()?)?))
+    let pad_rows = PadRowsPolicy::from_env()?;
+    let mut rs = reference_sources.iter().zip(SOURCES).map(|(weights,layer)| weights.wave(16,
+        CompressorWave::device_bytes(layer,16,pad_rows)?,pad_rows))
         .collect::<Result<Vec<_>>>()?;
     let leases = [bank.begin_request(0,11)?,bank.begin_request(1,22)?];
     let refs = [reference.begin_request(0,11)?,reference.begin_request(1,22)?];
@@ -424,6 +426,7 @@ fn real_all_cache_commits_preserve_prefixes_and_revoke_partial_failure() -> Resu
         .collect::<Result<Vec<_>>>()?;
     // The AOT capacity is 4096; the live second batch contains 2064 rows.
     let capacity = 4096;
+    let pad_rows = PadRowsPolicy::from_env()?;
     let mut windows = weights
         .iter()
         .map(|w| w.wave(capacity, WindowWave::device_bytes(&lib, capacity)?))
@@ -434,7 +437,8 @@ fn real_all_cache_commits_preserve_prefixes_and_revoke_partial_failure() -> Resu
         .map(|(w, l)| {
             w.wave(
                 capacity as usize,
-                CompressorWave::device_bytes(l, capacity as usize, PadRowsPolicy::from_env()?)?,
+                CompressorWave::device_bytes(l, capacity as usize, pad_rows)?,
+                pad_rows,
             )
         })
         .collect::<Result<Vec<_>>>()?;

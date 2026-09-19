@@ -3711,6 +3711,16 @@ impl NativeLibrary {
         })
     }
 
+    /// Resolve an arbitrary native symbol to a copyable value (raw function
+    /// pointer). Intended for tooling and tests that drive CPU stub libraries;
+    /// production code uses the typed methods on this type.
+    /// # Safety
+    /// `T` must match the symbol's ABI and type. The returned pointer must not
+    /// be used after this library is dropped; all symbol-specific contracts apply.
+    pub unsafe fn raw_fn<T: Copy>(&self, name: &[u8]) -> Result<T> {
+        Ok(unsafe { *self.lib.get::<T>(name)? })
+    }
+
     pub fn version(&self) -> Result<String> {
         let version_fn: Symbol<VersionFn> = unsafe { self.lib.get(b"ds41rt_native_version")? };
         let mut buf = vec![0 as c_char; 128];

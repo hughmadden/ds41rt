@@ -344,8 +344,21 @@ impl Drop for PendingProduction<'_, '_, '_> {
     }
 }
 impl<'w, 'a> BackboneExecution<'w, 'a> {
+    /// Read-only planning wrapper: captures the pad-rows policy from the
+    /// environment for this sizing invocation only. Constructors must instead
+    /// capture the policy once and use [`Self::workspace_bytes_with_policy`] so
+    /// their budget and the created waves share one policy value.
     pub fn workspace_bytes(library: &NativeLibrary, capacity: u32) -> Result<usize> {
         let pad_rows = crate::v41_compressor::PadRowsPolicy::from_env()?;
+        Self::workspace_bytes_with_policy(library, capacity, pad_rows)
+    }
+    /// Budget computed from ONE explicitly captured pad-rows policy — the same
+    /// value the created waves will use for their own layout and allocations.
+    pub fn workspace_bytes_with_policy(
+        library: &NativeLibrary,
+        capacity: u32,
+        pad_rows: crate::v41_compressor::PadRowsPolicy,
+    ) -> Result<usize> {
         let mut total = WindowWave::device_bytes(library, capacity)?
             .checked_mul(40)
             .context("window workspace budget overflow")?;
@@ -362,15 +375,17 @@ impl<'w, 'a> BackboneExecution<'w, 'a> {
         budget: usize,
     ) -> Result<Self> {
         ensure!(weights.placement.is_none(), "distributed producer weights require placed execution workspaces");
+        // Capture the pad-rows policy ONCE, before any allocation: this value
+        // computes the budget below and is passed unchanged to every wave.
+        let pad_rows = crate::v41_compressor::PadRowsPolicy::from_env()?;
         ensure!(
-            Self::workspace_bytes(weights.library, capacity)? <= budget,
+            Self::workspace_bytes_with_policy(weights.library, capacity, pad_rows)? <= budget,
             "cache producer workspace exceeds budget"
         );
         ensure!(
             weights.windows.len() == 40 && weights.sources.len() == 4,
             "cache producer weight owners incomplete"
         );
-        let pad_rows = crate::v41_compressor::PadRowsPolicy::from_env()?;
         let windows = weights
             .windows
             .iter()
@@ -389,6 +404,7 @@ impl<'w, 'a> BackboneExecution<'w, 'a> {
                 w.wave(
                     capacity as usize,
                     CompressorWave::device_bytes(layer, capacity as usize, pad_rows)?,
+                    pad_rows,
                 )
             })
             .collect::<Result<Vec<_>>>()?;

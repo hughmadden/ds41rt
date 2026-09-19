@@ -226,8 +226,9 @@ mod tests {
             let mut reference = CompressorState::new(&lib, layer, 2, 4, usize::MAX)?;
             let leases = [state.begin_request(0, 11)?, state.begin_request(1, 22)?];
             let originals = [reference.begin_request(0, 11)?, reference.begin_request(1, 22)?];
-            let mut waves = [weights.wave(16, usize::MAX)?, weights.wave(16, usize::MAX)?];
-            let mut direct = weights.wave(16, usize::MAX)?;
+            let pad_rows = super::PadRowsPolicy::from_env()?;
+            let mut waves = [weights.wave(16, usize::MAX, pad_rows)?, weights.wave(16, usize::MAX, pad_rows)?];
+            let mut direct = weights.wave(16, usize::MAX, pad_rows)?;
             let chunk = |lease, position| CompressorChunk { lease, position, tokens: 5 };
             for i in 0..2 {
                 let input: Vec<u8> = (0..5*5120).flat_map(|j| {

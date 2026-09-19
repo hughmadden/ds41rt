@@ -70,6 +70,15 @@ impl<'a> NativeRtxTensors<'a> {
             resident_bytes,
         })
     }
+    /// Test-only resident set over separately allocated device storage; used by
+    /// CPU stub-library tests that drive production waves without the catalog.
+    #[cfg(test)]
+    pub(crate) fn from_allocations(tensors: BTreeMap<String, DeviceAllocation<'a>>) -> Self {
+        Self {
+            tensors,
+            resident_bytes: 0,
+        }
+    }
     /// Borrowed native representation; never free or retain after the owner drops.
     pub fn get(&self, name: &str) -> Result<Ds41rtDeviceBuffer> {
         Ok(self

@@ -31,17 +31,30 @@ pub(crate) enum PadRowsPolicy {
 
 impl PadRowsPolicy {
     /// Capture the process policy once (per wave or per planning pass). An unset
-    /// or `0` value is off; only `2` and `16` are accepted and anything else is
-    /// rejected here, before any wave allocation happens.
+    /// or `0` value is off; only `2` and `16` are accepted. An empty,
+    /// whitespace-only, other or non-Unicode value is INVALID configuration and
+    /// is rejected here, before any wave allocation happens — it never silently
+    /// selects the off policy.
     pub(crate) fn from_env() -> Result<Self> {
-        Self::parse(std::env::var(PAD_ROWS_ENV).ok().as_deref())
+        match std::env::var(PAD_ROWS_ENV) {
+            Ok(value) => Self::parse(Some(&value)),
+            Err(std::env::VarError::NotPresent) => Ok(Self::Off),
+            Err(std::env::VarError::NotUnicode(_)) => anyhow::bail!(
+                "invalid {PAD_ROWS_ENV}: value is not valid Unicode; \
+                 allowed values are unset, 0, 2 or 16"
+            ),
+        }
     }
 
     fn parse(value: Option<&str>) -> Result<Self> {
         match value.map(str::trim) {
-            None | Some("") | Some("0") => Ok(Self::Off),
+            None | Some("0") => Ok(Self::Off),
             Some("2") => Ok(Self::Pad(2)),
             Some("16") => Ok(Self::Pad(16)),
+            Some("") => anyhow::bail!(
+                "invalid {PAD_ROWS_ENV}: value is empty; \
+                 allowed values are unset, 0, 2 or 16"
+            ),
             Some(other) => anyhow::bail!(
                 "invalid {PAD_ROWS_ENV}={other:?}: allowed values are unset, 0, 2 or 16"
             ),
@@ -113,18 +126,82 @@ mod tests {
     #[test]
     fn config_parses_off_by_default_and_accepts_only_2_or_16() {
         assert_eq!(PadRowsPolicy::parse(None).unwrap(), PadRowsPolicy::Off);
-        assert_eq!(PadRowsPolicy::parse(Some("")).unwrap(), PadRowsPolicy::Off);
         assert_eq!(PadRowsPolicy::parse(Some("0")).unwrap(), PadRowsPolicy::Off);
         assert_eq!(PadRowsPolicy::parse(Some("2")).unwrap(), PadRowsPolicy::Pad(2));
         assert_eq!(PadRowsPolicy::parse(Some("16")).unwrap(), PadRowsPolicy::Pad(16));
+        // Surrounding whitespace is trimmed away.
         assert_eq!(PadRowsPolicy::parse(Some(" 2 ")).unwrap(), PadRowsPolicy::Pad(2));
-        for invalid in ["1", "3", "15", "17", "02", "-2", "abc", "4096"] {
+        assert_eq!(PadRowsPolicy::parse(Some(" 0 ")).unwrap(), PadRowsPolicy::Off);
+        for invalid in ["", " ", "  ", "1", "3", "15", "17", "02", "-2", "abc", "4096"] {
             let error = PadRowsPolicy::parse(Some(invalid)).unwrap_err();
             assert!(
                 error.to_string().contains(PAD_ROWS_ENV),
-                "{invalid}: unexpected error: {error:#}"
+                "{invalid:?}: unexpected error: {error:#}"
             );
         }
+    }
+
+    /// Run `PadRowsPolicy::from_env` in an isolated child process with an exact
+    /// `DS41RT_COMPRESSOR_PAD_ROWS` value, so the parent test process never
+    /// mutates its own environment while tests run in parallel. The child is the
+    /// test binary itself, gated by `PAD_ROWS_CHILD` and filtered to this test.
+    fn from_env_in_child(value: Option<&std::ffi::OsStr>) -> String {
+        const MARKER: &str = "DS41RT_PAD_ROWS_POLICY_CHILD";
+        if let Ok(mode) = std::env::var(MARKER) {
+            // Child: report the captured policy and exit before any other tests.
+            assert_eq!(mode, "1");
+            let report = match PadRowsPolicy::from_env() {
+                Ok(PadRowsPolicy::Off) => "ok-off".to_string(),
+                Ok(PadRowsPolicy::Pad(rows)) => format!("ok-{rows}"),
+                Err(error) => format!("err-{}", error.to_string().contains(PAD_ROWS_ENV)),
+            };
+            println!("{report}");
+            std::process::exit(0);
+        }
+        let mut command = std::process::Command::new(std::env::current_exe().unwrap());
+        command
+            .arg("--exact")
+            .arg("v41_compressor::pad_rows::tests::from_env_rejects_invalid_environment_values")
+            .arg("--nocapture")
+            .env(MARKER, "1")
+            .env_remove(PAD_ROWS_ENV);
+        if let Some(value) = value {
+            command.env(PAD_ROWS_ENV, value);
+        }
+        let output = command.output().expect("spawn isolated child test binary");
+        assert!(
+            output.status.success(),
+            "isolated child failed: {}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+        String::from_utf8_lossy(&output.stdout)
+            .lines()
+            .find(|line| line.starts_with("ok-") || line.starts_with("err-"))
+            .expect("child must report the captured policy")
+            .to_string()
+    }
+
+    #[test]
+    fn from_env_rejects_invalid_environment_values() {
+        use std::os::unix::ffi::OsStringExt;
+        // Unset stays off; a non-Unicode, empty or whitespace-only value is
+        // invalid configuration, never a silent off.
+        assert_eq!(from_env_in_child(None), "ok-off");
+        assert_eq!(
+            from_env_in_child(Some(std::ffi::OsStr::new(""))),
+            "err-true"
+        );
+        assert_eq!(from_env_in_child(Some(std::ffi::OsStr::new("  "))), "err-true");
+        assert_eq!(
+            from_env_in_child(Some(std::ffi::OsStr::new("2"))),
+            "ok-2"
+        );
+        // Invalid UTF-8 bytes (no interior NUL: execve values are C strings).
+        let non_unicode = std::ffi::OsString::from_vec(vec![0xff, 0xfe, 0x01]);
+        assert_eq!(
+            from_env_in_child(Some(non_unicode.as_os_str())),
+            "err-true"
+        );
     }
 
     #[test]
