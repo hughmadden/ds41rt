@@ -158,3 +158,10 @@ past-stride and past-capacity slots stay in the full selected buffer and are
 accounted in the manifest so nothing is silently dropped. The shared compressed
 source pool is never dumped whole; raw unused ring/proposal padding is unscored.
 All files use `create_new` and refuse replacement.
+
+Referenced-row resolution uses the captured device metadata, even if it differs
+from the uploaded host view; `metadata_device_matches_host` exposes that mismatch.
+The 64 MiB data limit includes the host descriptor file and is checked before
+allocating or copying referenced rows. JSON metadata is outside that binary-byte
+limit. Invalid whole-row metadata must be rejected by the fixture consumer before
+interpreting the per-key references as live attention inputs.

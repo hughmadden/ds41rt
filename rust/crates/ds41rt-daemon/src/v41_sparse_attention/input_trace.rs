@@ -465,7 +465,7 @@ pub(crate) struct ReferencedSourceRows {
 }
 
 /// Kernel-exact referenced-row resolution. `selected` is the whole wave's
-/// `[rows, 512]` selection and `metadata` the whole wave's `[rows, 10]` host
+/// `[rows, 512]` selection and `metadata` the whole wave's `[rows, 10]` device
 /// metadata; `row_offset` is the request's first flattened row. For every
 /// selected slot: `id >= 0`, `id < m[5]`, `id < m[6]`, `id < page_stride*256`
 /// with `physical = pages[id/256]*256 + id%256 < source_capacity` is a paged
@@ -484,13 +484,19 @@ pub(crate) fn resolve_referenced_source_rows(
         .checked_add(request_rows)
         .context("row extent overflow")?;
     ensure!(
-        selected.len() >= total_rows * 512,
+        selected.len()
+            >= total_rows
+                .checked_mul(512)
+                .context("selection extent overflow")?,
         "referenced-row resolution selection covers {} rows but needs {}",
         selected.len() / 512,
         total_rows
     );
     ensure!(
-        metadata.len() >= total_rows * 10,
+        metadata.len()
+            >= total_rows
+                .checked_mul(10)
+                .context("metadata extent overflow")?,
         "referenced-row resolution metadata is shorter than its rows"
     );
     ensure!(
@@ -669,12 +675,29 @@ pub(crate) fn write_attention_inputs(
         "attention input trace request identity differs"
     );
     ensure!(
-        metadata.len() == rows * 10,
+        metadata.len() == rows.checked_mul(10).context("metadata extent overflow")?,
         "attention input trace metadata rows differ"
+    );
+    let mut live_rows = 0usize;
+    for (launch, identity) in launches.iter().zip(provenance) {
+        ensure!(
+            launch.rows == identity.positions.len(),
+            "attention trace position count differs"
+        );
+        live_rows = live_rows
+            .checked_add(launch.rows)
+            .context("row extent overflow")?;
+    }
+    ensure!(
+        live_rows == rows,
+        "attention trace flattened row count differs"
     );
     let batched = batch_host_bytes.is_some();
     let planned = plan_operand_reads(layer, rows, launches, buffers, batched)?;
-    let mut captured_bytes = total_bytes(&planned)?;
+    let mut captured_bytes = ensure_bounded(
+        total_bytes(&planned)?,
+        batch_host_bytes.map_or(0, |b| b.len()),
+    )?;
     let mut captured: Vec<CapturedRead> = Vec::with_capacity(planned.len());
     for read in planned {
         let bytes = match read.synthetic {
@@ -692,6 +715,8 @@ pub(crate) fn write_attention_inputs(
     // just captured: the exact selection, metadata and page table the kernel
     // reads. Never the whole shared compressed pool.
     let mut referenced: Vec<ReferencedCapture> = Vec::new();
+    let device_metadata =
+        u64_vec(&CapturedRead::find(&captured, ReadSource::Metadata, None)?.bytes)?;
     let selected = match buffers.selected {
         Some(_) => Some(i32_vec(
             &CapturedRead::find(&captured, ReadSource::Selected, None)?.bytes,
@@ -713,26 +738,49 @@ pub(crate) fn write_attention_inputs(
                 launch.rows,
                 row_offset,
                 selection,
-                metadata,
+                &device_metadata,
                 &pages,
                 source.page_stride,
                 source.capacity as u64,
             )?;
             let count = resolution.physical.len();
-            let mut values = vec![0u8; count * SOURCE_ROW_VALUES];
-            let mut scales = vec![0u8; count * SOURCE_ROW_SCALES];
+            let values_bytes = count
+                .checked_mul(SOURCE_ROW_VALUES)
+                .context("source values extent overflow")?;
+            let scales_bytes = count
+                .checked_mul(SOURCE_ROW_SCALES)
+                .context("source scales extent overflow")?;
+            captured_bytes = ensure_bounded(
+                captured_bytes,
+                values_bytes
+                    .checked_add(scales_bytes)
+                    .context("source extent overflow")?,
+            )?;
+            let mut values = vec![0u8; values_bytes];
+            let mut scales = vec![0u8; scales_bytes];
             for (index, &physical) in resolution.physical.iter().enumerate() {
                 let offset = usize::try_from(physical).context("physical row overflow")?;
                 copy(
-                    slice_buffer(source.values, offset * SOURCE_ROW_VALUES, SOURCE_ROW_VALUES)?,
+                    slice_buffer(
+                        source.values,
+                        offset
+                            .checked_mul(SOURCE_ROW_VALUES)
+                            .context("source values offset overflow")?,
+                        SOURCE_ROW_VALUES,
+                    )?,
                     &mut values[index * SOURCE_ROW_VALUES..(index + 1) * SOURCE_ROW_VALUES],
                 )?;
                 copy(
-                    slice_buffer(source.scales, offset * SOURCE_ROW_SCALES, SOURCE_ROW_SCALES)?,
+                    slice_buffer(
+                        source.scales,
+                        offset
+                            .checked_mul(SOURCE_ROW_SCALES)
+                            .context("source scales offset overflow")?,
+                        SOURCE_ROW_SCALES,
+                    )?,
                     &mut scales[index * SOURCE_ROW_SCALES..(index + 1) * SOURCE_ROW_SCALES],
                 )?;
             }
-            captured_bytes = ensure_bounded(captured_bytes, values.len() + scales.len())?;
             referenced.push(ReferencedCapture {
                 slot,
                 resolution,
@@ -777,7 +825,7 @@ pub(crate) fn write_attention_inputs(
             host,
         )?;
     }
-    let manifest = input_manifest(
+    let mut manifest = input_manifest(
         layer,
         rows,
         provenance,
@@ -790,6 +838,7 @@ pub(crate) fn write_attention_inputs(
         batched,
         captured_bytes,
     )?;
+    manifest["metadata_device_matches_host"] = serde_json::json!(device_metadata == metadata);
     write_new_file(
         directory,
         &format!("layer{layer}-attention-inputs.json"),
@@ -865,12 +914,12 @@ fn manifest_request(
                 "values": {
                     "file": trace_file(layer, "source-referenced-values", request),
                     "dtype": "fp4e2m1", "shape": [count, 512],
-                    "row_bytes": SOURCE_ROW_VALUES, "bytes": count * SOURCE_ROW_VALUES,
+                    "row_bytes": SOURCE_ROW_VALUES, "offset": 0, "bytes": count * SOURCE_ROW_VALUES,
                 },
                 "scales": {
                     "file": trace_file(layer, "source-referenced-scales", request),
                     "dtype": "fp8e4m3", "shape": [count, 32],
-                    "row_bytes": SOURCE_ROW_SCALES, "bytes": count * SOURCE_ROW_SCALES,
+                    "row_bytes": SOURCE_ROW_SCALES, "offset": 0, "bytes": count * SOURCE_ROW_SCALES,
                 },
                 "skipped": {
                     "masked": reference.resolution.masked,

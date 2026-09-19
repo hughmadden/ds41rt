@@ -13,6 +13,7 @@ use ds41rt_ffi::{Ds41rtDeviceBuffer, V41SparseSource, V41SparseWindow};
 struct FakeDevice {
     allocations: Vec<(usize, usize)>,
     reads: Vec<(usize, usize, usize)>,
+    contents: std::collections::BTreeMap<usize, Vec<u8>>,
 }
 impl FakeDevice {
     fn register(&mut self, bytes: usize) -> Ds41rtDeviceBuffer {
@@ -43,6 +44,10 @@ impl FakeDevice {
             bytes
         );
         self.reads.push((base, offset, src.bytes));
+        if let Some(contents) = self.contents.get(&base) {
+            dst.copy_from_slice(&contents[offset..offset + src.bytes]);
+            return Ok(());
+        }
         let address = src.ptr as usize;
         for (index, byte) in dst.iter_mut().enumerate() {
             *byte = ((address + index) & 0xff) as u8;
@@ -187,6 +192,13 @@ fn build_fixture(specs: &[RequestSpec], with_selection: bool) -> Fixture {
         pages.push(table);
         row_offset += spec.rows;
     }
+    device.contents.insert(
+        metadata_buffer.ptr as usize,
+        metadata
+            .iter()
+            .flat_map(|value| value.to_ne_bytes())
+            .collect(),
+    );
     Fixture {
         device,
         launches,
@@ -813,4 +825,143 @@ fn unuploaded_bounds_are_explicit_zeros_and_never_read() -> Result<()> {
     assert_eq!(manifest["wave"]["selected"], serde_json::json!(null));
     std::fs::remove_dir_all(&directory)?;
     Ok(())
+}
+
+#[test]
+fn captured_metadata_controls_source_reads_even_when_host_differs() -> Result<()> {
+    let mut fixture = build_fixture(
+        &[RequestSpec {
+            rows: 1,
+            request_id: 7,
+            positions: &[10],
+            source_bounds: Some((8, 8)),
+            pages: vec![0],
+            source_capacity_rows: 256,
+            bounded: false,
+        }],
+        true,
+    );
+    fixture
+        .device
+        .contents
+        .insert(fixture.selected, selection(1, &[(0, 0, 5)]));
+    fixture
+        .device
+        .contents
+        .insert(fixture.pages[0], 0u32.to_ne_bytes().to_vec());
+    // Device metadata permits committed row 5. A stale host view would drop it.
+    fixture.metadata[5] = 0;
+    let directory = scratch_directory("device-metadata");
+    std::fs::create_dir_all(&directory)?;
+    write_attention_inputs(
+        &mut |src, dst| fixture.device.copy(src, dst),
+        &directory,
+        2,
+        fixture.rows,
+        &fixture.provenance,
+        &fixture.launches,
+        &fixture.metadata,
+        &fixture.buffers,
+        None,
+    )?;
+    assert_eq!(
+        fixture.device.reads_from(fixture.source_values[0].unwrap()),
+        vec![(5 * 256, 256)]
+    );
+    let manifest = manifest_of(&directory);
+    assert_eq!(manifest["metadata_device_matches_host"], false);
+    assert_eq!(
+        manifest["requests"][0]["source"]["referenced"]["physical_rows"],
+        serde_json::json!([5])
+    );
+    std::fs::remove_dir_all(directory)?;
+    Ok(())
+}
+
+#[test]
+fn invalid_identity_and_resolver_overflow_fail_without_copying() {
+    assert!(
+        resolve_referenced_source_rows(usize::MAX / 512 + 1, 0, &[], &[], &[], 0, 0)
+            .unwrap_err()
+            .to_string()
+            .contains("overflow")
+    );
+    let mut fixture = build_fixture(
+        &[RequestSpec {
+            rows: 1,
+            request_id: 7,
+            positions: &[10],
+            source_bounds: None,
+            pages: vec![],
+            source_capacity_rows: 1,
+            bounded: false,
+        }],
+        false,
+    );
+    fixture.provenance[0].positions.clear();
+    let mut copies = 0;
+    let error = write_attention_inputs(
+        &mut |_, _| {
+            copies += 1;
+            Ok(())
+        },
+        std::path::Path::new("unused"),
+        0,
+        1,
+        &fixture.provenance,
+        &fixture.launches,
+        &fixture.metadata,
+        &fixture.buffers,
+        None,
+    )
+    .unwrap_err();
+    assert!(error.to_string().contains("position count"));
+    assert_eq!(copies, 0);
+}
+
+#[test]
+fn referenced_pool_budget_is_checked_before_any_pool_read() {
+    let rows = 500;
+    let positions = Box::leak((0..rows as u64).collect::<Vec<_>>().into_boxed_slice());
+    let mut fixture = build_fixture(
+        &[RequestSpec {
+            rows,
+            request_id: 7,
+            positions,
+            source_bounds: Some((256000, 256000)),
+            pages: (0..1000).collect(),
+            source_capacity_rows: 262144,
+            bounded: false,
+        }],
+        true,
+    );
+    fixture.device.contents.insert(
+        fixture.selected,
+        (0..256000i32).flat_map(|id| id.to_ne_bytes()).collect(),
+    );
+    fixture.device.contents.insert(
+        fixture.pages[0],
+        (0..1000u32).flat_map(|page| page.to_ne_bytes()).collect(),
+    );
+    let error = write_attention_inputs(
+        &mut |src, dst| fixture.device.copy(src, dst),
+        std::path::Path::new("unused"),
+        2,
+        rows,
+        &fixture.provenance,
+        &fixture.launches,
+        &fixture.metadata,
+        &fixture.buffers,
+        None,
+    )
+    .unwrap_err();
+    assert!(error.to_string().contains("budget"), "{error}");
+    assert!(fixture
+        .device
+        .reads_from(fixture.source_values[0].unwrap())
+        .is_empty());
+    assert!(fixture
+        .device
+        .reads_from(fixture.source_scales[0].unwrap())
+        .is_empty());
 }
