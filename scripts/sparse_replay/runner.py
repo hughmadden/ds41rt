@@ -63,6 +63,24 @@ class View(C.Structure):
 
 assert C.sizeof(View) == VIEW_BYTES
 
+# Exact native ABI, mirrored from native/include/ds41rt_v41_sparse_attention.h.
+# Keep these in lockstep with the header: the batch validator takes *two*
+# descriptor arguments (host then device), and only the launch entry point
+# takes the stream.  A regression that passes the stream where the device
+# descriptor buffer belongs makes the native side reject the batch before any
+# kernel launch (the device span check fails).
+BOUNDED_ARGTYPES = (
+    [C.c_void_p] * 5 + [C.c_int32, C.c_int32, C.POINTER(View)]
+    + [C.c_void_p] * 3 + [C.c_uint64, C.c_int32]
+)
+BATCH_VALIDATE_ARGTYPES = (
+    [C.c_void_p] * 5 + [C.c_int32, C.POINTER(View)]
+    + [C.c_void_p] * 3 + [C.c_uint64, C.c_int32, C.c_int32]
+)
+BATCH_ARGTYPES = (
+    [C.c_void_p] * 5 + [C.c_int32] + [C.c_void_p] * 4 + [C.c_int32] * 2
+)
+
 
 class RunnerError(Exception):
     pass
@@ -125,21 +143,13 @@ class _Session:
         if self.lib.ds41rt_v41_sparse_attention_initialize() != 0:
             raise RunnerError("sparse attention initialize failed")
         self.bounded = self.lib.ds41rt_v41_sparse_attention_bounded
-        self.bounded.argtypes = (
-            [C.c_void_p] * 5 + [C.c_int32, C.c_int32, C.POINTER(View)]
-            + [C.c_void_p] * 3 + [C.c_uint64, C.c_int32]
-        )
+        self.bounded.argtypes = BOUNDED_ARGTYPES
         self.bounded.restype = C.c_int32
         self.batch_validate = self.lib.ds41rt_v41_sparse_attention_batch_validate
-        self.batch_validate.argtypes = (
-            [C.c_void_p] * 5 + [C.c_int32, C.POINTER(View)]
-            + [C.c_void_p] * 3 + [C.c_uint64, C.c_int32, C.c_int32]
-        )
+        self.batch_validate.argtypes = BATCH_VALIDATE_ARGTYPES
         self.batch_validate.restype = C.c_int32
         self.batch = self.lib.ds41rt_v41_sparse_attention_batch
-        self.batch.argtypes = (
-            [C.c_void_p] * 5 + [C.c_int32] + [C.c_void_p] * 4 + [C.c_int32] * 2
-        )
+        self.batch.argtypes = BATCH_ARGTYPES
         self.batch.restype = C.c_int32
 
     def _upload(self, blob: bytes, dtype=None, shape=None):
@@ -217,6 +227,86 @@ class _Session:
             materialized=mat,
             mutation_evidence=(mutation["evidence"] if mutation else None),
         )
+
+
+def launch_batch(
+    session,
+    *,
+    query,
+    sink,
+    metadata,
+    selected,
+    output,
+    host_views,
+    descriptors,
+    stream,
+    bounds,
+    scratch,
+    rows,
+    parts,
+    compressed,
+):
+    """Validate host descriptors, upload them, then launch the device batch.
+
+    Extracted so the exact call path can be contract-tested on CPU with
+    duck-typed buffers (only ``session.torch.frombuffer`` and the descriptor
+    ``copy_`` are exercised).  The native validator receives the *device
+    descriptor buffer* address -- never the stream handle -- and the host
+    descriptors are uploaded only after validation succeeds, so a rejected
+    batch performs no device upload and no launch.
+
+    ``host_views`` is the ``(View * rows)`` array; its raw bytes are exactly
+    ``rows * VIEW_BYTES`` (120 bytes per descriptor row).  The device buffer and
+    the referenced allocations must stay alive through the launch.
+    """
+    status = session.batch_validate(
+        query.data_ptr(), sink.data_ptr(), metadata.data_ptr(),
+        selected.data_ptr(), output.data_ptr(), rows,
+        host_views,
+        descriptors.data_ptr(),
+        bounds.data_ptr(), scratch.data_ptr(),
+        scratch.numel() * 4, parts, compressed,
+    )
+    if status != 0:
+        return status
+    host_bytes = bytes(memoryview(host_views))
+    upload_host = session.torch.frombuffer(
+        bytearray(host_bytes), dtype=session.torch.uint8
+    )
+    descriptors.copy_(upload_host, non_blocking=False)
+    return session.batch(
+        query.data_ptr(), sink.data_ptr(), metadata.data_ptr(),
+        selected.data_ptr(), output.data_ptr(), rows,
+        descriptors.data_ptr(), stream, bounds.data_ptr(),
+        scratch.data_ptr(), parts, compressed,
+    )
+
+
+def classify_case(warmup_rc, repeat_records):
+    """Classify a case as pass / numerical_mismatch / unexecuted.
+
+    A rejected warmup or launch means the kernels never ran, so the case is
+    reported as *unexecuted* (unscored) and never as an arithmetic mismatch.
+    """
+    executed = warmup_rc == 0 and all(
+        repeat["executed"] for repeat in repeat_records
+    )
+    numerical_pass = executed and all(
+        row["byte_exact"]
+        for repeat in repeat_records for row in repeat["rows"]
+    )
+    if not executed:
+        status = "unexecuted"
+    elif numerical_pass:
+        status = "pass"
+    else:
+        status = "numerical_mismatch"
+    return {
+        "executed": executed,
+        "numerical_pass": numerical_pass,
+        "status": status,
+        "unscored": not executed,
+    }
 
 
 def run_cases(cases, index, oracle, native_path, native_sha256, output_dir,
@@ -306,32 +396,20 @@ def run_cases(cases, index, oracle, native_path, native_sha256, output_dir,
                 scratch.numel() * 4, parts,
             )
 
-        def launch_batch():
-            status = session.batch_validate(
-                query.data_ptr(), sink.data_ptr(), metadata.data_ptr(),
-                selected.data_ptr(), output.data_ptr(), rows,
-                (View * rows)(*[v.view for v in variants]),
-                stream, bounds.data_ptr(), scratch.data_ptr(),
-                scratch.numel() * 4, parts, 2,
-            )
-            if status != 0:
-                return status
-            descriptors_host = b"".join(
-                bytes(memoryview(v.view)) for v in variants
-            )
-            host = t.frombuffer(bytearray(descriptors_host), dtype=t.uint8)
-            descriptors.copy_(host, non_blocking=False)
-            return session.batch(
-                query.data_ptr(), sink.data_ptr(), metadata.data_ptr(),
-                selected.data_ptr(), output.data_ptr(), rows,
-                descriptors.data_ptr(), stream, bounds.data_ptr(),
-                scratch.data_ptr(), parts, 2,
+        def launch_batch_case():
+            return launch_batch(
+                session,
+                query=query, sink=sink, metadata=metadata,
+                selected=selected, output=output,
+                host_views=(View * rows)(*[v.view for v in variants]),
+                descriptors=descriptors, stream=stream, bounds=bounds,
+                scratch=scratch, rows=rows, parts=parts, compressed=2,
             )
 
         # Warmup launch + sync (probe pattern), discarded.  A non-zero rc is
         # recorded (lifecycle), not raised: comparison stays separate.
         output.zero_()
-        warmup_rc = launch_single(0) if case.kind == "single" else launch_batch()
+        warmup_rc = launch_single(0) if case.kind == "single" else launch_batch_case()
         t.cuda.synchronize()
 
         repeat_records = []
@@ -340,8 +418,13 @@ def run_cases(cases, index, oracle, native_path, native_sha256, output_dir,
             if case.kind == "single":
                 rc = [launch_single(0)]
             else:
-                rc = [launch_batch()]
+                rc = [launch_batch_case()]
             t.cuda.synchronize()
+            # Raw output rows are always written, including the untouched-zero
+            # buffer when a launch was rejected: the bytes are preserved for
+            # inspection, but rejected repeats are reported as unexecuted
+            # rather than as numerical mismatches.
+            executed = all(code == 0 for code in rc)
             actual = output.view(t.uint8).cpu().numpy().tobytes()
             row_results = []
             for row_pos, expected in enumerate(expected_rows):
@@ -353,16 +436,28 @@ def run_cases(cases, index, oracle, native_path, native_sha256, output_dir,
                     "expected_output_sha256": hashlib.sha256(
                         expected
                     ).hexdigest(),
-                    "byte_exact": stats["byte_diffs"] == 0,
+                    "executed": executed,
+                    "unscored": not executed,
+                    "status": (
+                        "unexecuted" if not executed
+                        else "byte_exact" if stats["byte_diffs"] == 0
+                        else "numerical_mismatch"
+                    ),
+                    "numerical_mismatch": executed and stats["byte_diffs"] != 0,
+                    # byte_exact is only a claim when the launch actually ran.
+                    "byte_exact": executed and stats["byte_diffs"] == 0,
                     **stats,
                 })
                 (case_dir / f"{case.kind}_repeat{repeat}_row{row_pos}.bin").write_bytes(got)
             repeat_records.append({
                 "repeat": repeat,
                 "launch_rc": rc,
+                "executed": executed,
+                "status": "executed" if executed else "unexecuted",
                 "rows": row_results,
             })
 
+        outcome = classify_case(warmup_rc, repeat_records)
         case_record = {
             "name": case.name,
             "kind": case.kind,
@@ -383,14 +478,13 @@ def run_cases(cases, index, oracle, native_path, native_sha256, output_dir,
                 hashlib.sha256(r).hexdigest() for r in expected_rows
             }) == 1,
             "warmup_rc": warmup_rc,
-            "all_repeats_rc0_and_byte_exact": (
-                warmup_rc == 0
-                and all(
-                    all(code == 0 for code in repeat["launch_rc"])
-                    and all(r["byte_exact"] for r in repeat["rows"])
-                    for repeat in repeat_records
-                )
-            ),
+            # A rejected warmup/launch is unexecuted, not a numerical mismatch;
+            # the raw (often zero) output rows above are still preserved.
+            "executed": outcome["executed"],
+            "status": outcome["status"],
+            "numerical_pass": outcome["numerical_pass"],
+            "unscored": outcome["unscored"],
+            "all_repeats_rc0_and_byte_exact": outcome["numerical_pass"],
             "repeats": repeat_records,
         }
         summary["cases"].append(case_record)
@@ -399,7 +493,23 @@ def run_cases(cases, index, oracle, native_path, native_sha256, output_dir,
         )
         del keepalive, variants
 
+    # process_rc 0 only means the runner itself completed; it is explicitly
+    # not a numerical pass.  Unscored cases are rejected before/at launch.
     summary["process_rc"] = 0
+    summary["process_rc_meaning"] = (
+        "runner completed; process rc 0 alone is not a numerical pass"
+    )
+    summary["unscored_cases"] = [
+        case["name"] for case in summary["cases"] if not case["executed"]
+    ]
+    summary["numerical_pass"] = all(
+        case["numerical_pass"] for case in summary["cases"]
+    )
+    summary["status"] = (
+        "pass" if summary["numerical_pass"]
+        else "unexecuted" if summary["unscored_cases"]
+        else "numerical_mismatch"
+    )
     (output_dir / "summary.json").write_text(
         json.dumps(summary, indent=2, sort_keys=True)
     )

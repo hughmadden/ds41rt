@@ -209,6 +209,11 @@ def main(argv=None) -> int:
         "native_library_sha256": summary["native_library_sha256"],
         "cases": len(summary["cases"]),
         "process_rc": summary["process_rc"],
+        # process_rc 0 alone is not a numerical pass: rejected launches are
+        # reported as unexecuted/unscored rather than as arithmetic failures.
+        "numerical_pass": summary["numerical_pass"],
+        "status": summary["status"],
+        "unscored_cases": summary["unscored_cases"],
     }, indent=2, sort_keys=True))
     return 0
 
