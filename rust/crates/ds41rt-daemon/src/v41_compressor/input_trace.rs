@@ -54,7 +54,8 @@ pub(crate) struct CompressorTraceBuffers {
     /// Ratio-two gate scores (FP32), absent at ratio one.
     pub scores: Option<Ds41rtDeviceBuffer>,
     /// Final pooled/normalized BF16 rows exactly as `kv.pack` and the index
-    /// projection read them (captured before any pack).
+    /// projection read them. The trace reads this unchanged input buffer after
+    /// the producer (including packing) has completed and before commit.
     pub output: Ds41rtDeviceBuffer,
     pub frequencies: Ds41rtDeviceBuffer,
     /// Device U64 positions upload: completed latents' first absolute token,
