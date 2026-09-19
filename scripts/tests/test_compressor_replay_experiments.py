@@ -129,11 +129,20 @@ def test_padded_planner_distinct_neighbour_flips_one_bf16_low_bit(tmp_path):
     assert blob[slot * ROW_BYTES:(slot + 1) * ROW_BYTES] == source
     neighbour_row = blob[neighbour * ROW_BYTES:(neighbour + 1) * ROW_BYTES]
     diffs = [i for i, (a, b) in enumerate(zip(neighbour_row, source)) if a != b]
-    assert diffs == [ROW_BYTES - 1]  # only the last BF16 value's low bit
-    assert neighbour_row[-1] ^ source[-1] == 0x01
+    # BF16 is little-endian, so the value's low bit is the low byte at -2, not
+    # the high byte at -1: exactly one byte differs, at offset 10238.
+    assert diffs == [ROW_BYTES - 2]
+    assert ROW_BYTES - 2 == 10238
+    assert neighbour_row[-2] ^ source[-2] == 0x01
+    assert neighbour_row[-1] == source[-1]  # the high byte is untouched
+    # The placement slot's real target row is unchanged by the neighbour.
+    assert neighbour != slot
+    assert blob[slot * ROW_BYTES:(slot + 1) * ROW_BYTES] == source
     # The exact provenance hash is recorded in the notes.
     recorded = hashlib.sha256(neighbour_row).hexdigest()
     assert any(recorded in note for note in experiment.notes)
+    assert any(f"offset {neighbour * ROW_BYTES + ROW_BYTES - 2}" in note
+               for note in experiment.notes)
 
 
 def test_padded_project_output_sizes_are_fp32_rows(tmp_path):

@@ -23,6 +23,7 @@ from .schema import (
     load_captures,
     resolve_predecessor,
 )
+from .validation import validate_experiment
 
 
 class CLIError(Exception):
@@ -96,6 +97,10 @@ def validate_and_plan(args) -> tuple:
     else:
         captures = load_captures(Path(args.activations))
     planned = exp.plan_experiments(captures, tag=args.tag)
+    # Structural gate: every selected experiment must validate before the
+    # plan is written or any --execute path can reach the GPU runner.
+    for experiment in planned:
+        validate_experiment(experiment)
 
     weights = captures[0].weights_provenance if captures else {}
     plan = {

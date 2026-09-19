@@ -30,6 +30,7 @@ from .ffi import (
     check_workspace_pointer,
     verify_native_library,
 )
+from .validation import validate_experiment
 
 DTYPE_NAMES = ("bfloat16", "float32", "uint64", "uint8")
 
@@ -320,6 +321,8 @@ def execute_experiment(session, experiment: PlannedExperiment, exp_dir: Path,
     returned rc 0.
     """
     exp_dir = Path(exp_dir)
+    # Reject a mis-wired plan before any allocation, upload or native call.
+    validate_experiment(experiment)
     exp_dir.mkdir(parents=True, exist_ok=False)
 
     tensors = {}

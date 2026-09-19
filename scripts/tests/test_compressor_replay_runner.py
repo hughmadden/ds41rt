@@ -70,7 +70,8 @@ def _pool_pack(rows=1, slots=4):
              "values": "values", "scales": "scales"},
         ],
         outputs=("output", "values", "scales"),
-        expected={},
+        expected={"output": bytes(rows * 512 * 2),
+                  "values": bytes(rows * 256), "scales": bytes(rows * 32)},
     )
 
 
@@ -81,7 +82,9 @@ def _direct_pack(rows=1, expected=None):
                                                      rows * 64 * 4)],
         stages=[{"kind": "pack", "input": "output", "frequencies":
                  "frequencies", "values": "values", "scales": "scales"}],
-        outputs=("values", "scales"), expected=expected or {},
+        outputs=("values", "scales"),
+        expected=expected if expected is not None else {
+            "values": bytes(rows * 256), "scales": bytes(rows * 32)},
     )
 
 
@@ -153,7 +156,8 @@ def test_run_experiments_reports_pass_and_writes_outputs(tmp_path):
 
 def test_run_experiments_reports_unscored_not_mismatch(tmp_path):
     session = _session(rcs=[5])
-    experiment = _direct_pack(expected={"values": b"x", "scales": b"y"})
+    experiment = _direct_pack(expected={"values": bytes(256),
+                                        "scales": bytes(32)})
     summary = runner.run_experiments([experiment], session,
                                      tmp_path / "run", repeats=2)
     assert summary["status"] == "unexecuted"
@@ -166,7 +170,10 @@ def test_counterfactual_failure_is_unexecuted_not_mismatch_or_pass(tmp_path):
     session = _session(rcs=[1])
     experiment = PlannedExperiment(
         name="cf", kind="C", rows=1, slots=4, counterfactual=True,
-        operands=[_op("input", 4), _op("wkv", 4), _op("wgate", 4)],
+        operands=[
+            _op("input", 5120 * 2), _op("wkv", 512 * 5120 * 2),
+            _op("wgate", 512 * 5120 * 2),
+        ],
         stages=[
             {"kind": "project", "input": "input", "weight": "wkv",
              "output": "projected"},

@@ -230,7 +230,9 @@ def plan_capture_baselines(capture: Capture, tag: str) -> List[PlannedExperiment
             _operand("frequencies", frequencies, "float32", (rows, 32, 2),
                      f"capture:{name}:frequencies"),
         ],
-        stages=_project_stages() + _pool_pack_stages(),
+        # The fresh projections produce roles "projected"/"scores"; the pool
+        # stage must read those names, not the recorded "kv"/"scores" operands.
+        stages=_project_stages() + _pool_pack_stages(kv="projected"),
         outputs=("projected", "scores", "output", "values", "scales"),
         expected={"projected": projected, "scores": scores, "output": output,
                   "values": kv_values, "scales": kv_scales},
@@ -648,7 +650,10 @@ def _padded_input_blob(capture: Capture, rows: int, placement: int,
     ]
     if distinct_neighbor is not None:
         mutated = bytearray(source)
-        mutated[-1] ^= 0x01  # BF16 low bit of the row's last input value
+        # BF16 element = 2 little-endian bytes: the value's low bit is bit 0
+        # of byte -2, not byte -1 (which holds the high 8 exponent/mantissa
+        # bits).  The provenance offset below has always pointed at -2.
+        mutated[-2] ^= 0x01
         padded[distinct_neighbor * row_bytes:
                (distinct_neighbor + 1) * row_bytes] = bytes(mutated)
         provenance.append(
