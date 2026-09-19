@@ -81,7 +81,12 @@ def dispatch_header(output: Path, manifest: dict) -> None:
     (output / 'v41_fp8_variants.h').write_text('\n'.join(lines) + '\n')
 
 
-def export(output: Path, rows: tuple[int, ...], projections=PROJECTIONS) -> None:
+def export(output: Path, rows: tuple[int, ...], projections=PROJECTIONS, *,
+           wob_m1_split1: bool = False) -> None:
+    if type(wob_m1_split1) is not bool:
+        raise ValueError('wob_m1_split1 must be boolean')
+    if wob_m1_split1 and (1 not in rows or not any(p[0] == 'o_b' for p in projections)):
+        raise ValueError('WO-B split1 export requires o_b at capacity1')
     os.environ['B12X_COMPILE_DISK_CACHE'] = '0'
     os.environ['B12X_COMPILE_MEMORY_CACHE'] = '0'
     import torch
@@ -98,6 +103,7 @@ def export(output: Path, rows: tuple[int, ...], projections=PROJECTIONS) -> None
     output.mkdir(parents=True, exist_ok=True)
     (output / 'v41_fp8.json').unlink(missing_ok=True)
     manifest = {'schema': 2, 'role': 'coordinator', 'capability': [props.major, props.minor],
+                'wob_m1_split1': wob_m1_split1,
                 'physical_sms': props.multi_processor_count, 'device': props.name,
                 'projections': [{'name': name, 'n': n, 'k': k, 'weight_block': [32,32],
                                  'groups': 8 if name == 'o_a' else 1,
@@ -107,6 +113,7 @@ def export(output: Path, rows: tuple[int, ...], projections=PROJECTIONS) -> None
     for name, n, k in projections:
         for capacity in rows:
             label = f'v41_{name}_fp8_m{capacity}'
+            force_split_k_one = wob_m1_split1 and name == 'o_b' and capacity == 1
             groups = 8 if name == 'o_a' else 1
             quant = (compile_wo_grouped_quant_aot(groups=groups, group_width=k // groups)
                      if groups > 1 else compile_mxfp8_rows_quant_aot(
@@ -117,7 +124,10 @@ def export(output: Path, rows: tuple[int, ...], projections=PROJECTIONS) -> None
                 rope_quant.export_to_c(str(output), label + '_quant_rope', 'ds41rt_' + label + '_quant_rope')
             gemm, split_k = compile_dense_gemm_mxfp8_aot(size_m=capacity, size_n=n // groups, size_k=k // groups, num_groups=groups,
                                               expected_m=capacity, sfb_k_replicated=False, device=device,
-                                              return_split_k_metadata=True)
+                                              return_split_k_metadata=True,
+                                              **({'force_split_k_one': True} if force_split_k_one else {}))
+            if force_split_k_one and split_k != 1:
+                raise ValueError('WO-B split1 compiler returned a split recipe')
             gemm.export_to_c(str(output), label + '_gemm', 'ds41rt_' + label + '_gemm')
             layout = _block_fp8_linear_scratch_layout(tokens=capacity, in_features=k,
                                                     out_features=n, output_dtype=torch.bfloat16)
@@ -138,6 +148,7 @@ def export(output: Path, rows: tuple[int, ...], projections=PROJECTIONS) -> None
                                     scratch_bytes=output_offset + capacity * n * 2,
                                     activation_mma_scale_shape=[32, 4, (capacity + 127) // 128, 4, k // groups // 128, groups])
             manifest['variants'].append({'capacity': capacity, 'label': label, 'input_dim': k, 'output_dim': n,
+                'force_split_k_one': force_split_k_one,
                 'activation_scratch_bytes': layout.nbytes,
                 'scratch_bytes': split_offset + split_bytes if split_k > 1 else layout.nbytes,
                 'split_k_offset': split_offset, 'split_k_bytes': split_bytes,
@@ -174,6 +185,8 @@ def main() -> None:
     parser.add_argument('--output-dir', type=Path, required=True)
     parser.add_argument('--rows', default='1,16,80,256,1024,4096')
     parser.add_argument('--projections', help='Comma-separated projection names; default exports all')
+    parser.add_argument('--wob-m1-split1', action='store_true',
+                        help='Use one K accumulation only for WO-B capacity1 (default unchanged)')
     args = parser.parse_args()
     rows = tuple(int(value) for value in args.rows.split(','))
     if not rows or len(set(rows)) != len(rows) or any(value not in (1,16,80,256,1024,4096) for value in rows):
@@ -181,7 +194,8 @@ def main() -> None:
     selected = args.projections.split(',') if args.projections else [p[0] for p in PROJECTIONS]
     if len(selected) != len(set(selected)) or set(selected) - {p[0] for p in PROJECTIONS}:
         parser.error('projections must be distinct supported names')
-    export(args.output_dir, rows, tuple(p for p in PROJECTIONS if p[0] in selected))
+    export(args.output_dir, rows, tuple(p for p in PROJECTIONS if p[0] in selected),
+           wob_m1_split1=args.wob_m1_split1)
 
 
 if __name__ == '__main__':

@@ -12,6 +12,10 @@ option(DS41RT_ENABLE_V41_LOCAL_EXPERT_AOT "Build full RTX backbone expert kernel
 option(DS41RT_ENABLE_V41_TP2_EXPERT_AOT "Build dual RTX TP2 encoder expert kernels" OFF)
 option(DS41RT_ENABLE_V41_EXPERT_AOT "Build native V4.1 expert AOT kernels" OFF)
 option(DS41RT_ENABLE_V41_FP8_AOT "Build native V4.1 coordinator FP8 AOT kernels" OFF)
+option(DS41RT_V41_WOB_M1_SPLIT1 "Use one K accumulation for WO-B capacity1 only" OFF)
+if(DS41RT_V41_WOB_M1_SPLIT1 AND NOT DS41RT_ENABLE_V41_FP8_AOT)
+  message(FATAL_ERROR "DS41RT_V41_WOB_M1_SPLIT1 requires DS41RT_ENABLE_V41_FP8_AOT")
+endif()
 option(DS41RT_ENABLE_RDMA "Build RDMA helper components when libibverbs is available" OFF)
 option(DS41RT_ENABLE_SPARKINFER_AOT "Build Spark-side SparkInfer AOT kernels" OFF)
 option(DS41RT_ENABLE_DS4_FLASH_AOT
