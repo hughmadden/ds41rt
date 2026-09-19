@@ -479,6 +479,24 @@ impl<'w, 'a> TargetPass<'w, 'a> {
                             &mut self.lane, &mut self.index)
                     }
                 })?;
+                // Read-only compressor-producer capture at the same explicit
+                // selection: by now the layer's producers completed in both
+                // the synchronous and cooperative paths, no capture is open,
+                // and no commit has mutated the pending state yet. One call
+                // per selected layer; `trace_compressor` itself skips layers
+                // that produce no fresh source, so every other layer of this
+                // pass (and every untraced pass) does no extra work.
+                if let Some((directory, weights_directory)) = detail_trace.as_ref() {
+                    requests.with_requests(|requests| {
+                        self.execution.trace_compressor(
+                            requests.cache(),
+                            guard.batch.cache()?,
+                            layer,
+                            directory,
+                            weights_directory,
+                        )
+                    })?;
+                }
                 // No RefCell guard or bank reference survives into this await.
                 let prepared = if let Some((directory, weights_directory)) = detail_trace {
                     prepared.trace_input(directory, weights_directory).await?

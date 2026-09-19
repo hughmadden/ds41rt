@@ -165,3 +165,53 @@ The 64 MiB data limit includes the host descriptor file and is checked before
 allocating or copying referenced rows. JSON metadata is outside that binary-byte
 limit. Invalid whole-row metadata must be rejected by the fixture consumer before
 interpreting the per-key references as live attention inputs.
+
+## Compressor producer input capture — 19 September 2026 AEST
+
+The same `DS41RT_ACTIVATION_TRACE_DIR` + `DS41RT_ACTIVATION_TRACE_POSITION` +
+`DS41RT_ACTIVATION_TRACE_DETAIL_LAYER` selection also captures the completed
+compressed-source producer of that layer. The target pass makes one explicit
+call after `prepare_layer`/`prepare_layer_cooperative` returns (producers are
+settled in both the synchronous and cooperative paths, no CUDA graph capture is
+open, and no commit has mutated the pending state) and before the FFN input
+trace — never from `CompressorWave::output()`, which live consumers call
+repeatedly. `trace_compressor` skips explicitly when the layer is not one of
+the four sources (2/8/14/20) or the stage reuses committed sources (decoder
+and encoder replay), so a stale producer is never read; unselected layers and
+untraced passes add no synchronization, no D2H copy and no allocation.
+
+Each selected batch directory additionally contains (`layerN` is the source
+layer; rows are WAVE rows of that one invocation, not logical compressed rows):
+
+| File | Exact native contents |
+| --- | --- |
+| `layerN-compressor-input.bin` | BF16 `[rows,5120]` live input rows — the wave's D2D copy of `layerN-query-hidden.bin`; compare the two to prove D2D identity |
+| `layerN-compressor-projected.bin` | FP32 `[rows,512]` (`cublasGemmEx` BF16×BF16→FP32 via `wkv`; BF16 at ratio one) |
+| `layerN-compressor-scores.bin` | FP32 `[rows,512]` gate scores (ratio two only) |
+| `layerN-compressor-output.bin` | BF16 `[rows,512]` pooled/normalized output exactly as `kv.pack` and the index projection read it |
+| `layerN-compressor-frequencies.bin` | FP32 `[rows,32,2]` backbone frequencies |
+| `layerN-compressor-positions.bin` | Device U64 `[rows]`: each completed latent's first absolute token; uploaded zero padding marks rows that complete no latent |
+| `layerN-compressor-descriptors-device.bin` / `-host.bin` | Actual device U64 `[rows]` predecessor descriptors and the staged host upload (ratio two only, byte-compared) |
+| `layerN-compressor-kv-values.bin` | FP4 `[rows,512]` packed values (256 B/row) |
+| `layerN-compressor-kv-scales.bin` | E4M3 `[rows,32]` group scales |
+| `layerN-compressor-pending-kv.bin` / `-pending-scores.bin` | Whole FP32 `[slot_count,512]` pending-state planes (ratio two only, slots ≤ 16); slots not in this wave are UNSCORED padding |
+| `layerN-compressor-inputs.json` | Manifest: layer/ratio/rows, proposal snapshot, per-chunk request ids, lease slots/generations, versions, prepared offsets, flattened row ranges, absolute positions, per-row device descriptors and resolved predecessors, completed-latent mapping (first token → 0-based logical compressed row), buffer records, UNSCORED slot states, weight tensor records, byte budget |
+| `<trace-root>/projection-weights/layerN-compressor-wkv-weight.bin` | BF16 `[512,5120]` already-loaded `layers.N.attn.compressor.wkv.weight`, written once per trace root |
+| `<trace-root>/projection-weights/layerN-compressor-wgate-weight.bin` | BF16 `[512,5120]` `wgate.weight` (ratio two only, once per root) |
+| `<trace-root>/projection-weights/layerN-compressor-norm-weight.bin` | BF16 `[512]` `norm.weight` (once per root) |
+
+Predecessors resolve from the actual device descriptor only: a value below
+`slot_count` pools that pending slot; `slot_count + r` (with `r` strictly
+before the row) pools earlier wave row `r`; `u64::MAX` is the even-position
+sentinel (the row completes no latent); anything else is recorded as
+`unresolved` rather than reinterpreted. `device_matches_host` reports the
+actual-versus-staged comparison and the device bytes stay authoritative. A
+logical compressed row (for example p41 → logical row 20, whose FP4 nibble
+difference at column 294 motivated this capture) is derived solely through
+`wave_rows[].completed_latent.logical_compressed_row` — wave rows 0/1 of a
+1–2 row decode wave are not logical compressed rows. Column 294 sits in the
+native pack path, not RoPE (RoPE columns are 448..511); group maxima can be
+recomputed later on CPU from the captured output — no kernel debug output was
+added. Every extent, weight tensor identity and the cumulative 64 MiB budget
+(host descriptor bytes and weight tensors included) is validated before the
+first copy; all files use `create_new` and refuse replacement.
