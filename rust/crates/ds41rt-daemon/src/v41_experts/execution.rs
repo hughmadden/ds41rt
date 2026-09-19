@@ -7,6 +7,7 @@ use ds41rt_ffi::{
 };
 use std::ffi::c_void;
 mod timing;
+mod trace;
 use timing::ExpertTiming;
 
 #[derive(Debug, Clone, Copy)]
@@ -688,6 +689,9 @@ impl ExpertExecution<'_, '_> {
         }
         self.synchronize()?;
         let executed_us = started.map(|t| t.elapsed().as_micros() as u64);
+        // Opt-in bounded diagnostic capture of the completed, still-owned
+        // buffers; never fails the request and never touches exchange state.
+        self.trace_completed_request(request, executor_id, exchange, output, destination.is_some());
         if destination.is_none() {
             self.library.copy_d2h(&mut exchange.partials[..bytes], Ds41rtDeviceBuffer { bytes, ..output })?;
         }
@@ -730,3 +734,5 @@ impl ExpertExecution<'_, '_> {
 
 #[cfg(test)]
 mod mapped_tests;
+#[cfg(test)]
+mod trace_tests;

@@ -111,6 +111,14 @@ impl<'a> V41BackboneRequest<'a> {
     pub fn layer(&self) -> u32 {
         self.view.header.layer_id
     }
+    /// Wire request identity, for diagnostics and opt-in tracing only.
+    pub fn request_id(&self) -> u64 {
+        self.view.header.request_id
+    }
+    /// Wire placement version paired with `request_id` for uniqueness.
+    pub fn placement_version(&self) -> u64 {
+        self.view.header.placement_version
+    }
     /// Require the representation advertised by the bound native kernel before
     /// copying bytes into its input allocation. Wire parsing alone cannot do this.
     pub fn require_input_dtype(&self, native_dtype: u32) -> Result<()> {
@@ -383,6 +391,19 @@ mod tests {
             .copy_routes_into(&mut ids[..95], &mut weights)
             .is_err());
         assert!(V41BackboneRequest::parse(&frame, 15).is_err());
+    }
+    #[test]
+    fn native_wire_identity_is_readable_for_diagnostics() {
+        let owned = request(1);
+        let frame = owned.encode().unwrap();
+        let native = V41BackboneRequest::parse(&frame, 16).unwrap();
+        assert_eq!(native.request_id(), owned.header.request_id);
+        assert_eq!(native.placement_version(), owned.header.placement_version);
+        let mut bumped = owned.clone();
+        bumped.header.request_id += 1;
+        let frame = bumped.encode().unwrap();
+        let native = V41BackboneRequest::parse(&frame, 16).unwrap();
+        assert_eq!(native.request_id(), owned.header.request_id + 1);
     }
     #[test]
     fn native_request_rejects_invalid_routing_and_legacy_modes() {
