@@ -89,6 +89,16 @@ pub(super) fn run(
     client: Arc<Client>,
     receive: mpsc::Receiver<Message>,
 ) -> Result<u64> {
+    // Python hosts do not install a Rust subscriber. Keep diagnostic tracing
+    // local to the CUDA owner thread and activate it only for an explicit dump.
+    let _trace = std::env::var_os("DS41RT_ACTIVATION_TRACE_DIR").map(|_| {
+        let subscriber = tracing_subscriber::fmt()
+            .with_env_filter("error,ds41rt::activation_trace=debug")
+            .with_ansi(false)
+            .with_writer(std::io::stderr)
+            .finish();
+        tracing::subscriber::set_default(subscriber)
+    });
     with_target(
         TargetConfig {
             owner: config.owner,

@@ -195,6 +195,7 @@ unsafe impl TargetDriver for NativeDriver<'_, '_, '_> {
     }
     async fn execute(&mut self, batch: &mut NativeBatch, input: &TargetInput) -> Result<()> {
         self.pass.set_route_capture(self.draft.borrow().as_deref().is_some_and(NativeDraft::capture_routes));
+        self.pass.set_trace_lane(self.lane);
         unsafe { self.pass.execute_shared(&self.requests, &mut batch.batch,
             self.transport, input.placement, &input.selected).await?; }
         Ok(())
@@ -225,6 +226,7 @@ unsafe impl TargetDriver for NativeDriver<'_, '_, '_> {
             offset += input.tokens.len(); rows
         }).collect::<Vec<_>>();
         self.pass.set_route_capture(self.draft.borrow().as_deref().is_some_and(NativeDraft::capture_routes));
+        self.pass.set_trace_lane(self.lane);
         unsafe { self.pass.execute_shared(&self.requests, &mut batch.batch,
             self.transport, inputs[0].placement, &selected).await?; }
         Ok(())

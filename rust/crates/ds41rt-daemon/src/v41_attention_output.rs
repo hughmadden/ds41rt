@@ -18,6 +18,7 @@ pub(crate) struct AttentionOutputWeights<'a> {
     tensors: NativeRtxTensors<'a>,
     grouped_scales: DeviceAllocation<'a>,
     scales: DeviceAllocation<'a>,
+    trace_root: std::cell::RefCell<Option<std::path::PathBuf>>,
 }
 impl<'a> AttentionOutputWeights<'a> {
     fn names(layer: usize) -> Result<[String; 4]> {
@@ -77,6 +78,7 @@ impl<'a> AttentionOutputWeights<'a> {
             tensors,
             grouped_scales,
             scales,
+            trace_root: Default::default(),
         })
     }
     pub fn wave(&self, capacity: u32, budget: usize) -> Result<AttentionOutputWave<'_, 'a>> {
@@ -473,6 +475,61 @@ impl AttentionOutputWave<'_, '_> {
     pub fn chain_graph_identity(&self) -> [usize; 2] {
         [self.b(0).ptr as usize, self.weights as *const _ as usize]
     }
+    /// Read completed combined-chain storage without falsely publishing output().
+    /// # Safety
+    /// The enclosing sparse chain (including both projections) has completed;
+    /// this wave and its scratch/weights remain exclusively retained through all
+    /// copies. `rows` is the exact live row count of that completed invocation.
+    pub unsafe fn trace_completed(&self, rows: usize, directory: &std::path::Path,
+        weights_directory: &std::path::Path) -> Result<()> {
+        use crate::v41_backbone_lane::trace_buffers;
+        use serde_json::json;
+        use std::io::Write;
+        ensure!(rows > 0 && rows <= self.capacity as usize, "projection trace rows exceed capacity");
+        let layer = self.weights.layer;
+        let b = |i| trace_span(self.b(i), rows, ROW_BYTES[i]);
+        let (grouped_info, grouped) = unsafe { self.grouped.completed_scratch(self.grouped_scratch.buffer, rows as u32)? };
+        let (kernel_info, scratch) = unsafe { self.kernel.completed_scratch(self.scratch.buffer, rows as u32)? };
+        trace_buffers(self.stream.library, directory, layer, &[
+            ("attention-values", b(0)?), ("wo-a-output", b(1)?), ("wo-b-output", b(2)?),
+            ("projection-positions", b(3)?), ("attention-frequencies", b(4)?),
+            ("wo-a-scratch", grouped), ("wo-b-scratch", scratch),
+            ("projection-alpha", self.alpha.buffer),
+        ])?;
+        // Immutable loaded weights are shared by both lanes. Copy them once per
+        // explicit trace root, not once per batch/context. A failed write never
+        // marks that root complete and create_new prevents silent replacement.
+        if self.weights.trace_root.borrow().as_deref() != Some(weights_directory) {
+            std::fs::create_dir_all(weights_directory)?;
+            trace_buffers(self.stream.library, weights_directory, layer, &[
+                ("wo-b-weight", self.weights.tensors.get(&self.weights.names[2])?),
+                ("wo-b-scales", self.weights.tensors.get(&self.weights.names[3])?),
+                ("wo-b-packed-scales", self.weights.scales.buffer),
+            ])?;
+            *self.weights.trace_root.borrow_mut() = Some(weights_directory.to_path_buf());
+        }
+        let info = |info: ds41rt_ffi::V41Fp8Info| json!({
+            "abi_version":info.abi_version,"capacity_rows":info.capacity_rows,
+            "input_dim":info.input_dim,"output_dim":info.output_dim,"scratch_bytes":info.scratch_bytes,
+            "values_offset":info.values_offset,"row_scales_offset":info.row_scales_offset,
+            "mma_scales_offset":info.mma_scales_offset,"packed_weight_scale_bytes":info.packed_weight_scale_bytes});
+        let metadata = json!({"schema":1,"layer":layer,"live_rows":rows,
+            "positions_file":format!("layer{layer}-projection-positions.bin"),
+            "alpha_file":format!("layer{layer}-projection-alpha.bin"),
+            "attention_values":{"file":format!("layer{layer}-attention-values.bin"),"dtype":"bfloat16","shape":[rows,32768]},
+            "wo_a_output":{"file":format!("layer{layer}-wo-a-output.bin"),"dtype":"bfloat16","shape":[rows,8192]},
+            "wo_b_output":{"file":format!("layer{layer}-wo-b-output.bin"),"dtype":"bfloat16","shape":[rows,5120]},
+            "wo_a":{"scratch_file":format!("layer{layer}-wo-a-scratch.bin"),"kernel_info":info(grouped_info)},
+            "wo_b":{"scratch_file":format!("layer{layer}-wo-b-scratch.bin"),"kernel_info":info(kernel_info)},
+            "weights_directory":weights_directory,
+            "weight_files":{"values":format!("layer{layer}-wo-b-weight.bin"),
+                "scales":format!("layer{layer}-wo-b-scales.bin"),"packed_scales":format!("layer{layer}-wo-b-packed-scales.bin")}});
+        let mut file = std::fs::OpenOptions::new().write(true).create_new(true)
+            .open(directory.join(format!("layer{layer}-projection.json")))?;
+        file.write_all(&serde_json::to_vec_pretty(&metadata)?)?;
+        Ok(())
+    }
+
     pub fn output(&self) -> Result<AttentionOutput<'_>> {
         let rows = self.ready.context("attention output unpublished")? as usize;
         let b = |i| {
@@ -512,5 +569,29 @@ impl Drop for AttentionOutputWave<'_, '_> {
         {
             tracing::error!(%error,"draining attention output graph");
         }
+    }
+}
+
+fn trace_span(mut buffer: Ds41rtDeviceBuffer, rows: usize, row_bytes: usize) -> Result<Ds41rtDeviceBuffer> {
+    let bytes = rows.checked_mul(row_bytes).context("projection trace byte extent overflow")?;
+    ensure!(rows > 0 && row_bytes > 0 && bytes <= buffer.bytes && !buffer.ptr.is_null(),
+        "projection trace exceeds completed storage");
+    buffer.bytes = bytes; Ok(buffer)
+}
+
+#[cfg(test)]
+mod trace_tests {
+    use super::*;
+    #[test]
+    fn trace_spans_include_only_live_rows_and_reject_overflow() {
+        let storage = Ds41rtDeviceBuffer { ptr: std::ptr::NonNull::<u8>::dangling().as_ptr().cast(), bytes: 16 * 65536, device_id: 0, flags: 0 };
+        for (rows, width) in [(1,65536),(4,16384),(4,10240),(4,8),(4,256)] {
+            let view = trace_span(storage,rows,width).unwrap();
+            assert_eq!(view.bytes,rows*width); assert_eq!(view.ptr,storage.ptr);
+        }
+        assert!(trace_span(storage,17,65536).is_err());
+        assert!(trace_span(storage,usize::MAX,2).is_err());
+        assert!(trace_span(storage,0,65536).is_err());
+        assert!(trace_span(Ds41rtDeviceBuffer{ptr:std::ptr::null_mut(),..storage},1,8).is_err());
     }
 }

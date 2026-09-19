@@ -55,6 +55,70 @@ impl<'a> RequestAccess<'a> for std::cell::RefCell<&mut Requests<'a>> {
     }
 }
 
+/// Opt-in grouped diagnostic selection. Pure by construction so the CPU tests
+/// exercise the exact production selection without a device, bank, or env.
+/// Member slots follow the real native concatenation order: member 0's rows
+/// are the leading flattened rows, exactly as `CacheBatch::positions` builds
+/// them by iterating the batch's requests in order.
+#[derive(Debug, serde::Serialize)]
+pub(crate) struct ActivationTraceMember {
+    /// Index of this request inside its group, in native concatenation order.
+    pub slot: usize,
+    /// Real bank request identity for this member.
+    pub request_id: u64,
+    /// Every flattened row this member contributes to the pass, ascending.
+    pub flattened_rows: Vec<usize>,
+    /// Committed absolute position of each flattened row, same order.
+    pub positions: Vec<u64>,
+    /// Flattened rows of this member whose position equals the filter.
+    pub matched_rows: Vec<usize>,
+}
+#[derive(Debug, serde::Serialize)]
+pub(crate) struct ActivationTraceMap {
+    pub filter_position: u64,
+    /// All flattened rows matching the filter, across every member.
+    pub matched_rows: Vec<usize>,
+    pub members: Vec<ActivationTraceMember>,
+}
+
+/// Select every flattened row whose committed absolute position equals
+/// `filter`. Returns `None` when no row matches, so a group with no member at
+/// the filter position never opens a dump directory (unmatched batches are
+/// excluded, not partially traced). Setting an earlier filter position still
+/// captures that earlier step whenever any member reaches it.
+pub(crate) fn select_activation_trace(filter: u64, rows: &[crate::v41_backbone_router::ExpertRow])
+    -> Option<ActivationTraceMap> {
+    let mut members: Vec<ActivationTraceMember> = Vec::new();
+    let mut matched_rows = Vec::new();
+    for (flattened_row, row) in rows.iter().enumerate() {
+        let slot = match members.iter().position(|m| m.request_id == row.request_id) {
+            Some(slot) => slot,
+            None => {
+                members.push(ActivationTraceMember {
+                    slot: members.len(),
+                    request_id: row.request_id,
+                    flattened_rows: Vec::new(),
+                    positions: Vec::new(),
+                    matched_rows: Vec::new(),
+                });
+                members.len() - 1
+            }
+        };
+        let member = &mut members[slot];
+        member.flattened_rows.push(flattened_row);
+        member.positions.push(row.position);
+        if row.position == filter {
+            member.matched_rows.push(flattened_row);
+            matched_rows.push(flattened_row);
+        }
+    }
+    if matched_rows.is_empty() {
+        None
+    } else {
+        Some(ActivationTraceMap { filter_position: filter, matched_rows, members })
+    }
+}
+
 #[derive(Default, Debug, PartialEq, Eq)]
 enum State {
     #[default]
@@ -107,6 +171,9 @@ pub(crate) struct TargetPass<'w, 'a> {
     taps: TargetTapWave<'a>,
     engram_timeout: Duration,
     state: State,
+    /// Diagnostic-only lane identity supplied by the owning driver; `None`
+    /// means this pass was not told its lane and dumps must not invent one.
+    trace_lane: std::cell::Cell<Option<usize>>,
 }
 impl<'w, 'a> TargetPass<'w, 'a> {
     pub fn set_route_capture(&mut self, enabled: bool) {
@@ -144,7 +211,14 @@ impl<'w, 'a> TargetPass<'w, 'a> {
             taps,
             engram_timeout,
             state: State::Idle,
+            trace_lane: std::cell::Cell::new(None),
         })
+    }
+    /// Opt-in diagnostic metadata only: records which scheduling lane owns this
+    /// pass so grouped activation dumps name the real lane. Never affects
+    /// model, transport, or selection execution.
+    pub fn set_trace_lane(&self, lane: usize) {
+        self.trace_lane.set(Some(lane));
     }
     /// # Safety
     /// All components belong to the same device, capacity and official model.
@@ -255,12 +329,32 @@ impl<'w, 'a> TargetPass<'w, 'a> {
         let stage = batch.cache()?.stage();
         let activation_trace = if tracing::enabled!(target: "ds41rt::activation_trace", tracing::Level::DEBUG) {
             let position: u64 = std::env::var("DS41RT_ACTIVATION_TRACE_POSITION")?.parse()?;
-            if batch.cache()?.positions().first() == Some(&position) {
-                let directory = std::path::PathBuf::from(std::env::var("DS41RT_ACTIVATION_TRACE_DIR")?)
-                    .join(format!("batch{id}-{stage:?}-{rows}rows"));
+            // Grouped selection: dump only when at least one flattened row of
+            // any member sits at the filter position; rows of every matching
+            // member are mapped, and batches with no match are excluded.
+            if let Some(map) = select_activation_trace(position, &batch.cache()?.expert_rows()) {
+                let root = std::path::PathBuf::from(std::env::var("DS41RT_ACTIVATION_TRACE_DIR")?);
+                let lane = self.trace_lane.get();
+                // Both lane owners share one trace root; the real lane (when
+                // known) keeps their batch directories unambiguous and their
+                // create_new manifests from colliding.
+                let directory = root.join(match lane {
+                    Some(lane) => format!("lane{lane}-batch{id}-{stage:?}-{rows}rows"),
+                    None => format!("batch{id}-{stage:?}-{rows}rows"),
+                });
                 std::fs::create_dir_all(&directory)?;
                 std::fs::write(directory.join("positions.json"), serde_json::to_vec(&batch.cache()?.positions())?)?;
-                Some(directory)
+                std::fs::write(directory.join("members.json"), serde_json::to_vec_pretty(&serde_json::json!({
+                    "schema": 2,
+                    "batch_identity": id,
+                    "stage": format!("{stage:?}"),
+                    "rows": rows,
+                    // `null` when the owning driver never supplied a lane; the
+                    // directory name falls back to the legacy singleton form.
+                    "lane": lane,
+                    "map": map,
+                }))?)?;
+                Some((directory, root.join("projection-weights")))
             } else { None }
         } else { None };
         ensure!(
@@ -303,6 +397,10 @@ impl<'w, 'a> TargetPass<'w, 'a> {
             }
         }
         for layer in stage.windows() {
+            let detail_trace = activation_trace.as_ref().filter(|_| {
+                std::env::var("DS41RT_ACTIVATION_TRACE_DETAIL_LAYER").ok()
+                    .and_then(|value| value.parse::<usize>().ok()) == Some(layer)
+            });
             if layer != stage.windows().start {
                 let prepare_timing = Instant::now();
                 self.lane.advance()?;
@@ -355,6 +453,9 @@ impl<'w, 'a> TargetPass<'w, 'a> {
                 tracing::debug!(target: "ds41rt::timing", layer, rows, advance_us, engram_us, taps_us=tapped_us-advance_us-engram_us, begin_us=prepare_timing.elapsed().as_micros() as u64-tapped_us, "target layer preparation");
             }
             unsafe {
+                if let Some((directory, _)) = detail_trace {
+                    self.lane.trace_query(directory)?;
+                }
                 let cooperative = requests.cooperative_completion();
                 if cooperative {
                     let mut production = requests.with_requests(|requests| self.execution.enqueue_production_and_index(
@@ -373,12 +474,15 @@ impl<'w, 'a> TargetPass<'w, 'a> {
                     }
                 })?;
                 // No RefCell guard or bank reference survives into this await.
+                let prepared = if let Some((directory, weights_directory)) = detail_trace {
+                    prepared.trace_input(directory, weights_directory).await?
+                } else { prepared };
                 let completed = prepared.execute(transport, placement, guard.batch.image_mask()).await?;
                 if cooperative {
                     self.execution.complete_layer_cooperative(guard.batch.cache()?, &mut self.lane, completed).await?;
                 } else { self.execution.complete_layer(guard.batch.cache()?, &mut self.lane, completed)?; }
             }
-            if let Some(directory) = &activation_trace {
+            if let Some((directory, _)) = &activation_trace {
                 self.lane.trace_output(directory)?;
             }
         }
@@ -534,3 +638,81 @@ mod tests {
 
 #[cfg(test)]
 mod distributed_tests;
+
+#[cfg(test)]
+mod activation_trace_tests {
+    use super::select_activation_trace;
+    use crate::v41_backbone_router::ExpertRow;
+    use ds41rt_transport::ExpertV2SourceKind;
+
+    fn rows(member: &[(u64, u64)]) -> Vec<ExpertRow> {
+        member.iter().map(|&(request_id, position)| ExpertRow {
+            request_id,
+            position,
+            kind: ExpertV2SourceKind::Decode,
+        }).collect()
+    }
+
+    #[test]
+    fn selects_every_member_row_at_filter_position_across_members() {
+        // Four-member C4-shaped group in native concatenation order: three
+        // members contribute rows, two different members both sit at the
+        // filter position (simulated overlapping absolute positions).
+        let all = rows(&[(100, 40), (100, 41), (100, 42), (101, 7), (101, 8), (102, 41), (102, 42)]);
+        let map = select_activation_trace(42, &all).expect("position 42 must match");
+        // Every flattened row at the filter position, from every member.
+        assert_eq!(map.matched_rows, vec![2, 6]);
+        assert_eq!(map.members.len(), 3);
+        // Real per-member slot/request/row mapping in concatenation order.
+        assert_eq!(map.members[0].slot, 0);
+        assert_eq!(map.members[0].request_id, 100);
+        assert_eq!(map.members[0].flattened_rows, vec![0, 1, 2]);
+        assert_eq!(map.members[0].positions, vec![40, 41, 42]);
+        assert_eq!(map.members[0].matched_rows, vec![2]);
+        assert_eq!(map.members[1].slot, 1);
+        assert_eq!(map.members[1].request_id, 101);
+        assert_eq!(map.members[1].flattened_rows, vec![3, 4]);
+        assert_eq!(map.members[1].positions, vec![7, 8]);
+        assert_eq!(map.members[1].matched_rows, Vec::<usize>::new());
+        assert_eq!(map.members[2].slot, 2);
+        assert_eq!(map.members[2].request_id, 102);
+        assert_eq!(map.members[2].flattened_rows, vec![5, 6]);
+        assert_eq!(map.members[2].positions, vec![41, 42]);
+        assert_eq!(map.members[2].matched_rows, vec![6]);
+    }
+
+    #[test]
+    fn excludes_batches_without_any_member_at_filter_position() {
+        let all = rows(&[(100, 40), (100, 41), (101, 7)]);
+        assert!(select_activation_trace(42, &all).is_none());
+        // A filter before every member's first position also excludes.
+        assert!(select_activation_trace(0, &all).is_none());
+        // An empty group never selects.
+        assert!(select_activation_trace(42, &[]).is_none());
+    }
+
+    #[test]
+    fn earliest_matching_step_is_selectable_by_position() {
+        // Root can target an earlier step: the filter position picks the pass
+        // where any member row sits exactly at it, regardless of member order.
+        let all = rows(&[(100, 10), (101, 42), (102, 42), (103, 43)]);
+        let map = select_activation_trace(10, &all).expect("earlier position must match");
+        assert_eq!(map.matched_rows, vec![0]);
+        assert_eq!(map.members[0].request_id, 100);
+        assert_eq!(map.members[0].matched_rows, vec![0]);
+    }
+
+    #[test]
+    fn same_member_reappearing_keeps_one_slot() {
+        // Defensive: if a batch ever interleaves rows of one request, the
+        // member mapping must not fabricate a second slot for it.
+        let all = rows(&[(100, 5), (101, 6), (100, 42)]);
+        let map = select_activation_trace(42, &all).expect("position 42 must match");
+        assert_eq!(map.members.len(), 2);
+        assert_eq!(map.members[0].request_id, 100);
+        assert_eq!(map.members[0].flattened_rows, vec![0, 2]);
+        assert_eq!(map.members[0].matched_rows, vec![2]);
+        assert_eq!(map.members[1].request_id, 101);
+        assert_eq!(map.members[1].matched_rows, Vec::<usize>::new());
+    }
+}

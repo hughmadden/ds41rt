@@ -116,6 +116,9 @@ impl StreamDriver for NativeStreamDriver<'_, '_, '_, '_> {
     async fn encode(&mut self, plan: &StreamPlan, tokens: &[u32], keep_running: &dyn Fn() -> bool) -> Result<()> {
         let [first, second] = &mut self.target.contexts;
         let chunks = tokens.chunks(plan.chunk_rows).collect::<Vec<_>>();
+        // Diagnostic metadata only: name the real owning lane in any opt-in dump.
+        first.driver.pass.set_trace_lane(first.driver.lane);
+        second.driver.pass.set_trace_lane(second.driver.lane);
         // Both contexts are exclusively borrowed for this whole operation; no
         // independent request can enter either one until the result is consumed.
         unsafe { first.driver.pass.execute_encoder_stream(second.driver.pass,
@@ -132,6 +135,8 @@ impl StreamDriver for NativeStreamDriver<'_, '_, '_, '_> {
         }])?);
         let first = &mut self.target.contexts[0].driver;
         let suffix = self.suffix.as_ref().unwrap().output()?;
+        // Diagnostic metadata only: name the real owning lane in any opt-in dump.
+        first.pass.set_trace_lane(first.lane);
         unsafe { first.pass.execute_replay(&requests, self.replay_batch.as_mut().unwrap(),
             first.transport, 0, &plan.selected, &suffix).await?; }
         Ok(())
