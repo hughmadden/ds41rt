@@ -181,17 +181,22 @@ def remap_batch(
     own slot content.
     """
     if strategy == "wave":
+        # Wave regrouping keeps the original pending-slot plane, so the
+        # descriptor space stays [0, slot_count) pending + [slot_count,
+        # slot_count+row) earlier wave rows.
         slot_map: Dict[int, int] = {}
         descriptors = remap_descriptors(
             descriptors_in_new_order, original_rows_in_new_order,
             original_slot_count=original_slot_count, row_map=row_map,
-            slot_map=slot_map, new_slot_count=0, strategy=strategy,
+            slot_map=slot_map, new_slot_count=original_slot_count,
+            strategy=strategy,
         )
         provenance = tuple(
             f"new row {p} keeps original descriptor {d:#x} semantics"
             for p, d in enumerate(descriptors_in_new_order)
         )
-        return BatchRemap(descriptors, 0, strategy, provenance, {})
+        return BatchRemap(descriptors, original_slot_count, strategy,
+                          provenance, {})
 
     if strategy != "compact_pending":
         raise RemapError(f"unknown remap strategy {strategy!r}")

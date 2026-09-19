@@ -21,6 +21,7 @@ import hashlib
 import json
 from dataclasses import dataclass, field
 from pathlib import Path
+from typing import Optional
 
 from .ffi import (
     WORKSPACE_ALIGNMENT,
@@ -280,13 +281,43 @@ class PlannedExperiment:
     notes: tuple = ()
 
 
+def _check_role_aliasing(experiment: PlannedExperiment, tensors: dict) -> None:
+    """Distinct produced roles must never share a buffer address.
+
+    A produced role aliasing a read-only operand would let a launch overwrite
+    the operand before a later stage reads it; the same address under two
+    different role names is always a harness bug, never a kernel contract.
+    """
+    address_roles: dict = {}
+    for role, tensor in tensors.items():
+        address = tensor.data_ptr()
+        previous = address_roles.get(address)
+        if previous is not None and previous != role:
+            raise RunnerError(
+                f"experiment {experiment.name}: roles {previous!r} and "
+                f"{role!r} alias the same buffer {address:#x}"
+            )
+        address_roles[address] = role
+
+
+def _first_nonzero_stage(stages) -> Optional[dict]:
+    """The first stage whose recorded rc is a nonzero native failure."""
+    for stage in stages:
+        rc = stage.get("rc")
+        if rc is not None and rc != 0:
+            return stage
+    return None
+
+
 def execute_experiment(session, experiment: PlannedExperiment, exp_dir: Path,
                        repeats: int = 3) -> dict:
     """Warm up once (probe, discarded) then run ``repeats`` recorded runs.
 
-    Raw output bytes are written per repeat regardless of execution status —
-    but a rejected launch is reported unexecuted/unscored, never as a byte
-    comparison, and its (typically zero) outputs carry no numerical claim.
+    A rejected launch stops the dependent chain, suppresses every download,
+    byte comparison and output file write for that run, and is reported
+    unexecuted/unscored.  Nothing zero-filled ever stands in for a kernel
+    result: raw output bytes are recorded only from runs whose stages all
+    returned rc 0.
     """
     exp_dir = Path(exp_dir)
     exp_dir.mkdir(parents=True, exist_ok=False)
@@ -297,6 +328,7 @@ def execute_experiment(session, experiment: PlannedExperiment, exp_dir: Path,
         tensor = upload(session, operand.blob, operand.dtype, operand.shape)
         tensors[operand.role] = tensor
         keepalive.append(tensor)
+    operand_roles = {operand.role for operand in experiment.operands}
     for role in experiment.outputs:
         if role not in tensors:
             # Outputs are allocated zeroed; they are not operands.
@@ -304,6 +336,7 @@ def execute_experiment(session, experiment: PlannedExperiment, exp_dir: Path,
             tensor = upload(session, b"\x00" * size)
             tensors[role] = tensor
             keepalive.append(tensor)
+    _check_role_aliasing(experiment, tensors)
 
     def launch_all():
         stages = []
@@ -321,21 +354,29 @@ def execute_experiment(session, experiment: PlannedExperiment, exp_dir: Path,
         return stages
 
     def zero_outputs():
+        # Never erase a supplied read-only operand: only produced roles that
+        # are not themselves operands of this experiment are cleared.
         for role in experiment.outputs:
+            if role in operand_roles:
+                continue
             tensors[role].zero_()
 
-    zero_outputs()
-    warmup_stages = launch_all()
-    session.synchronize()
-    warmup_rc = [s["rc"] for s in warmup_stages if s["rc"] is not None]
-    warmup_ok = bool(warmup_rc) and all(rc == 0 for rc in warmup_rc)
-
-    repeat_records = []
-    for repeat in range(repeats):
+    def run_once(repeat: int) -> dict:
         zero_outputs()
         stages = launch_all()
         session.synchronize()
         executed = all(s["rc"] == 0 for s in stages if s["rc"] is not None)
+        if not executed:
+            failure = _first_nonzero_stage(stages)
+            return {
+                "repeat": repeat,
+                "stages": stages,
+                "executed": False,
+                "unscored": True,
+                "failed_stage": failure["stage"] if failure else None,
+                "roles": {},                 # no download, no comparison
+                "raw_outputs_written": False,
+            }
         actual = {}
         for role in experiment.outputs:
             actual[role] = download(session, tensors[role])
@@ -348,28 +389,59 @@ def execute_experiment(session, experiment: PlannedExperiment, exp_dir: Path,
             role_results[role] = {
                 "expected_sha256": hashlib.sha256(expected).hexdigest(),
                 "actual_sha256": (
-                    hashlib.sha256(got).hexdigest() if got else None
+                    hashlib.sha256(got).hexdigest() if got is not None else None
                 ),
-                "byte_exact": executed and exact,
-                "compared": executed,
+                "byte_exact": exact,
+                "compared": True,
             }
-        repeat_records.append({
+        return {
             "repeat": repeat,
             "stages": stages,
-            "executed": executed,
-            "unscored": not executed,
+            "executed": True,
+            "unscored": False,
+            "failed_stage": None,
             "roles": role_results,
-        })
+            "raw_outputs_written": True,
+        }
 
-    executed = warmup_ok and all(r["executed"] for r in repeat_records)
-    if experiment.counterfactual:
-        # Counterfactuals are evidence, never gates: no accuracy claim, no
-        # oracle comparison (their expected dict is empty by construction).
-        status = "executed" if executed else "unexecuted"
-    elif not executed:
+    zero_outputs()
+    warmup_stages = launch_all()
+    session.synchronize()
+    warmup_rc = [s["rc"] for s in warmup_stages if s["rc"] is not None]
+    warmup_ok = bool(warmup_rc) and all(rc == 0 for rc in warmup_rc)
+    warmup_failure = _first_nonzero_stage(warmup_stages)
+
+    repeat_records = []
+    for repeat in range(repeats):
+        if not warmup_ok:
+            # The probe launch was rejected: do not run dependent repeats, do
+            # not download or write any numeric output.
+            repeat_records.append({
+                "repeat": repeat, "stages": [],
+                "executed": False, "unscored": True,
+                "failed_stage": (
+                    warmup_failure["stage"] if warmup_failure else None
+                ),
+                "roles": {}, "raw_outputs_written": False,
+            })
+            continue
+        repeat_records.append(run_once(repeat))
+
+    executed = warmup_ok and bool(repeat_records) and all(
+        r["executed"] for r in repeat_records
+    )
+    if not executed:
+        # A rejected launch is always unexecuted/unscored, for counterfactual
+        # and gating experiments alike -- never a numerical mismatch or pass.
         status = "unexecuted"
-    elif all(all(r["byte_exact"] for r in rep["roles"].values())
-             for rep in repeat_records):
+    elif experiment.counterfactual:
+        # Counterfactuals are evidence, never gates: no accuracy claim and no
+        # oracle comparison (their expected dict is empty by construction).
+        status = "executed"
+    elif repeat_records and all(
+        r["roles"] and all(rr["byte_exact"] for rr in r["roles"].values())
+        for r in repeat_records
+    ):
         status = "pass"
     else:
         status = "numerical_mismatch"
@@ -382,6 +454,7 @@ def execute_experiment(session, experiment: PlannedExperiment, exp_dir: Path,
         "slots": experiment.slots,
         "repeats": repeats,
         "warmup_stages": warmup_stages,
+        "warmup_rejected": not warmup_ok,
         "executed": executed,
         "status": status,
         "gates": not experiment.counterfactual,

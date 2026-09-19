@@ -22,6 +22,7 @@ is made — they never gate the component baseline.
 
 from __future__ import annotations
 
+import hashlib
 from dataclasses import dataclass
 from typing import Dict, List, Optional, Sequence, Tuple
 
@@ -610,6 +611,136 @@ def plan_cross_substitution(reference: Capture, candidate: Capture,
 
 
 # ---------------------------------------------------------------------------
+# Family P (fixed-size padded project-only placement counterfactuals).
+# ---------------------------------------------------------------------------
+
+PADDED_ROWS = (2, 16)
+PADDED_SLOTS = {2: (0, 1), 16: (0, 1, 7, 15)}
+DISTINCT_NEIGHBOR = {2: 1, 16: 15}
+
+
+def current_input_row(capture: Capture) -> int:
+    """The captured *current* row: the row that completes a latent."""
+    for row, wave_row in enumerate(capture.wave_rows):
+        if wave_row.get("completed_latent") is not None:
+            return row
+    return capture.rows - 1
+
+
+def _padded_input_blob(capture: Capture, rows: int, placement: int,
+                       distinct_neighbor: Optional[int],
+                       current_row: int) -> Tuple[bytes, Tuple[str, ...]]:
+    """Zero-fill ``rows`` input rows, put the real current row at ``placement``.
+
+    With ``distinct_neighbor`` set, one *other* slot holds the same real row
+    with the low bit of its last BF16 input value flipped, so that slot is a
+    neighbour distinct from both zero padding and the exact row.  The exact
+    provenance and hashes are returned for the record.
+    """
+    row_bytes = ROW_BYTES["input"]
+    source = row_slice(capture.read_buffer("input"), row_bytes, current_row)
+    padded = bytearray(rows * row_bytes)
+    padded[placement * row_bytes:(placement + 1) * row_bytes] = source
+    provenance = [
+        f"zero-filled padding: {rows} rows, slot {placement} = real current "
+        f"input row {current_row} (bytes {len(source)}, "
+        f"sha256 {hashlib.sha256(source).hexdigest()})"
+    ]
+    if distinct_neighbor is not None:
+        mutated = bytearray(source)
+        mutated[-1] ^= 0x01  # BF16 low bit of the row's last input value
+        padded[distinct_neighbor * row_bytes:
+               (distinct_neighbor + 1) * row_bytes] = bytes(mutated)
+        provenance.append(
+            f"distinct neighbour: slot {distinct_neighbor} = real row "
+            f"{current_row} with BF16 low bit of the last input value "
+            f"flipped (offset {distinct_neighbor * row_bytes + len(mutated) - 2}"
+            f", sha256 {hashlib.sha256(bytes(mutated)).hexdigest()})"
+        )
+    return bytes(padded), tuple(provenance)
+
+
+def plan_padded_project_only(capture: Capture, tag: str = ""
+                             ) -> List[PlannedExperiment]:
+    """Fixed-size padded PROJECT-ONLY placement counterfactuals at rows 2 and 16.
+
+    Each experiment runs the existing native project path only (WKV and Wgate)
+    at a fixed padded batch size, with the capture's real current input row at
+    one slot and every unused slot zero-filled.  Slots 0/1 are used at rows 2
+    and slots 0/1/7/15 at rows 16; each batch size also gets one distinct-
+    neighbour variant whose neighbour holds the real row with the low bit of
+    its last BF16 input value flipped.
+
+    These carry ``counterfactual=True`` and an empty ``expected`` dict: they
+    are raw FP32 evidence for a later placement-invariance and exact-dot
+    comparison, never a numeric gate, and no pooling runs on the padding.
+    """
+    name = capture.directory.name
+    current_row = current_input_row(capture)
+    wkv = capture.read_weight("wkv")
+    wgate = capture.read_weight("wgate")
+    experiments: List[PlannedExperiment] = []
+    for rows in PADDED_ROWS:
+        for placement in PADDED_SLOTS[rows]:
+            blob, provenance = _padded_input_blob(
+                capture, rows, placement, None, current_row
+            )
+            experiments.append(PlannedExperiment(
+                name=f"{tag}{name}_P_pad{rows}_slot{placement}", kind="P",
+                rows=rows, slots=capture.slot_count, counterfactual=True,
+                operands=[
+                    _operand("input", blob, "bfloat16", (rows, 5120),
+                             f"padding:{name}:slot{placement} real row "
+                             f"{current_row} + zero neighbors"),
+                    _operand("wkv", wkv, "bfloat16", (512, 5120),
+                             f"capture:{name}:wkv-weight"),
+                    _operand("wgate", wgate, "bfloat16", (512, 5120),
+                             f"capture:{name}:wgate-weight"),
+                ],
+                stages=_project_stages(),
+                outputs=("projected", "scores"),
+                expected={},
+                notes=(
+                    f"P padded project-only: rows {rows}, real current row "
+                    f"{current_row} at slot {placement}, all other slots zero.",
+                    "no pooling on padding; counterfactual projection evidence "
+                    "only, no numeric gate.",
+                    *provenance,
+                ),
+            ))
+        neighbor = DISTINCT_NEIGHBOR[rows]
+        placement = PADDED_SLOTS[rows][0]
+        blob, provenance = _padded_input_blob(
+            capture, rows, placement, neighbor, current_row
+        )
+        experiments.append(PlannedExperiment(
+            name=f"{tag}{name}_P_pad{rows}_slot{placement}_distinct_nb{neighbor}",
+            kind="P", rows=rows, slots=capture.slot_count, counterfactual=True,
+            operands=[
+                _operand("input", blob, "bfloat16", (rows, 5120),
+                         f"padding:{name}:slot{placement} real row "
+                         f"{current_row} + distinct neighbor slot {neighbor}"),
+                _operand("wkv", wkv, "bfloat16", (512, 5120),
+                         f"capture:{name}:wkv-weight"),
+                _operand("wgate", wgate, "bfloat16", (512, 5120),
+                         f"capture:{name}:wgate-weight"),
+            ],
+            stages=_project_stages(),
+            outputs=("projected", "scores"),
+            expected={},
+            notes=(
+                f"P padded project-only: rows {rows}, real current row "
+                f"{current_row} at slot {placement}, distinct neighbour at "
+                f"slot {neighbor} (last BF16 input value low bit flipped).",
+                "no pooling on padding; counterfactual projection evidence "
+                "only, no numeric gate.",
+                *provenance,
+            ),
+        ))
+    return experiments
+
+
+# ---------------------------------------------------------------------------
 # Top-level planning.
 # ---------------------------------------------------------------------------
 
@@ -631,6 +762,7 @@ def plan_experiments(captures: Sequence[Capture], *, tag: str = "") -> List[Plan
     for capture in captures:
         experiments += plan_capture_baselines(capture, tag)
         experiments.append(plan_mutation_variant(capture, tag))
+        experiments += plan_padded_project_only(capture, tag)
     reference = select_reference(captures)
     candidates = [c for c in captures if c is not reference]
     for capture in candidates:

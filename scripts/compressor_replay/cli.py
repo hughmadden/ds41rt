@@ -20,6 +20,7 @@ from . import experiments as exp
 from .schema import (
     CaptureError,
     load_capture,
+    load_captures,
     resolve_predecessor,
 )
 
@@ -82,17 +83,48 @@ def validate_and_plan(args) -> tuple:
 
     native_sha256 = verify_native_library(args.native_library,
                                           args.native_sha256)
-    captures = []
-    for directory, manifest in find_captures(args.activations, args.manifest):
-        captures.append(load_capture(directory, manifest_path=manifest))
+    if args.manifest is not None:
+        manifest = Path(args.manifest)
+        directory = manifest.parent
+        # The weights live under the explicit activations root when it is a
+        # real activations directory, otherwise beside the capture.
+        root = Path(args.activations)
+        if not (root / "projection-weights").is_dir():
+            root = directory.parent
+        captures = [load_capture(directory, activations_root=root,
+                                 manifest_path=manifest)]
+    else:
+        captures = load_captures(Path(args.activations))
     planned = exp.plan_experiments(captures, tag=args.tag)
 
+    weights = captures[0].weights_provenance if captures else {}
     plan = {
         "mode": "validate/plan (CPU only)",
         "activations": str(args.activations),
         "native_library": str(args.native_library),
         "native_library_sha256": native_sha256,
         "repeats": args.repeats,
+        "weights": {
+            "directory": weights.get("weights_dir"),
+            "first_writer_manifest": weights.get("first_writer_manifest"),
+            "first_writer_manifests": weights.get("first_writer_manifests", []),
+            "recorded_remote_directory_provenance_only": weights.get(
+                "recorded_remote_directory_provenance_only"
+            ),
+            "already_written_bindings": weights.get(
+                "already_written_bindings", []
+            ),
+            "tensors": {
+                role: {
+                    "file": ref.path.name,
+                    "dtype": ref.dtype,
+                    "shape": list(ref.shape),
+                    "bytes": ref.bytes,
+                    "sha256": ref.sha256,
+                }
+                for role, ref in (captures[0].weights.items() if captures else ())
+            },
+        },
         "captures": [
             {
                 "name": c.directory.name,
@@ -103,6 +135,7 @@ def validate_and_plan(args) -> tuple:
                 "rows": c.rows,
                 "slot_count": c.slot_count,
                 "device_matches_host": c.device_matches_host,
+                "p41_rows": c.p41_rows(),
                 "predecessors": [
                     {"row": r,
                      "descriptor": c.device_descriptors[r],
