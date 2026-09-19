@@ -12,6 +12,12 @@ pub struct StreamInput {
     pub selected: Vec<usize>,
 }
 
+impl StreamInput {
+    pub(crate) fn validate(&self, chunk_rows: usize, max_context: u64) -> Result<()> {
+        StreamPlan::new(self, chunk_rows, max_context).map(|_| ())
+    }
+}
+
 struct StreamPlan {
     request: RequestHandle,
     end: usize,
@@ -195,21 +201,35 @@ impl<'s, 'w, 'a> NativeTarget<'s, 'w, 'a> {
     /// is mutably borrowed by a scoped streaming future.
     pub fn runtime(&self) -> &'s tokio::runtime::Runtime { self.runtime }
 
+    pub(crate) fn validate_stream(&self, input: &StreamInput) -> Result<()> {
+        self.bank.active.healthy()?;
+        ensure!(self.contexts.iter().all(|lane| lane.job.is_none()), "native contexts have outstanding work");
+        self.bank.active.idle(input.request)?;
+        input.validate(self.stream_chunk_rows, self.contexts[0].driver.max_context)?;
+        let requests = self.bank.requests.borrow();
+        ensure!(requests.cache().stage(input.request)? == CacheStage::Full
+            && requests.cache().committed_end(input.request)? == 0,
+            "streaming prefill requires a fresh admission");
+        Ok(())
+    }
+    /// Command identity only. Whole-target borrowing owns both contexts during
+    /// streaming; this does not invent another physical cache transaction.
+    pub(crate) fn stream_identity(&self, input: &StreamInput) -> Result<Ticket> {
+        self.validate_stream(input)?;
+        self.bank.active.identity(input.request, 0)
+    }
+    pub(crate) fn revoke_stream_admission(&self, request: RequestHandle) -> Result<()> {
+        self.bank.active.healthy()?;
+        self.bank.requests.borrow_mut().release_if_present(request)
+    }
+
     /// Fresh-prompt CED: retained two-context encoder overlap, then one decoder
     /// replay of the final 128 rows. No sampler, HTTP or copied model/cache.
     /// The callback is checked at native chunk admission and publication fences.
     pub async fn stream_prefill<'r>(&'r mut self, input: StreamInput,
         keep_running: &dyn Fn() -> bool) -> Result<StreamingResult<'r, 's, 'w, 'a>> {
-        self.bank.active.healthy()?;
-        ensure!(self.contexts.iter().all(|lane| lane.job.is_none()), "native contexts have outstanding work");
-        self.bank.active.idle(input.request)?;
-        let plan = StreamPlan::new(&input, self.contexts[0].capacity, self.contexts[0].driver.max_context)?;
-        {
-            let requests = self.bank.requests.borrow();
-            ensure!(requests.cache().stage(input.request)? == CacheStage::Full
-                && requests.cache().committed_end(input.request)? == 0,
-                "streaming prefill requires a fresh admission");
-        }
+        self.validate_stream(&input)?;
+        let plan = StreamPlan::new(&input, self.stream_chunk_rows, self.contexts[0].driver.max_context)?;
         let mut session = StreamSession { driver: NativeStreamDriver { target: self,
             suffix: None, replay_batch: None, begun: false }, plan, tokens: input.tokens,
             ready: false, armed: true };

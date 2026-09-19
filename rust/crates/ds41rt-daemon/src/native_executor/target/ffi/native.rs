@@ -100,17 +100,69 @@ pub(super) fn run(
             cache_bytes: config.source_pool_budget_bytes,
         },
         |mut target| {
-            let (runtime, bank, contexts) = target.split();
-            let fences = [
-                ConsumerFence::new(bank.library())?,
-                ConsumerFence::new(bank.library())?,
+            let runtime = target.runtime();
+            let mut fences = [
+                ConsumerFence::new(target.bank().library())?,
+                ConsumerFence::new(target.bank().library())?,
             ];
             client.state.lock().expect("client state").initialized = true;
             client.reply(
                 0,
-                Ok(json!({"state":"initialized","bank":actor::Bank::info(bank)})),
+                Ok(json!({"state":"initialized","bank":actor::Bank::info(target.bank())})),
             );
-            runtime.block_on(actor::run(bank, contexts, fences, client, receive))
+            let mut receive = receive;
+            loop {
+                let next = {
+                    let (_, bank, contexts) = target.split();
+                    runtime.block_on(actor::run(
+                        bank,
+                        contexts,
+                        &mut fences,
+                        client.clone(),
+                        &mut receive,
+                    ))?
+                };
+                match next {
+                    actor::Exit::Shutdown(id) => return Ok(id),
+                    actor::Exit::Stream(message) => runtime.block_on(stream::run(
+                        &mut target,
+                        message,
+                        &mut fences[0],
+                        client.clone(),
+                        &mut receive,
+                    ))?,
+                }
+            }
         },
     )
+}
+
+impl stream::Output for StreamingResult<'_, '_, '_, '_> {
+    fn logits(&self) -> Result<Logits<'_>> {
+        StreamingResult::logits(self)
+    }
+    fn commit(self) -> Result<u64> {
+        StreamingResult::commit(self)
+    }
+    fn cancel(self) -> Result<()> {
+        StreamingResult::cancel(self)
+    }
+}
+impl<'s, 'w, 'a> stream::Backend for NativeTarget<'s, 'w, 'a> {
+    type Ready<'r>
+        = StreamingResult<'r, 's, 'w, 'a>
+    where
+        Self: 'r;
+    fn identity(&self, input: &StreamInput) -> Result<Ticket> {
+        self.stream_identity(input)
+    }
+    async fn execute<'r>(&'r mut self, input: StreamInput) -> Result<Self::Ready<'r>> {
+        self.stream_prefill(input, &|| true).await
+    }
+    fn revoke(&self, request: RequestHandle) -> Result<()> {
+        self.revoke_stream_admission(request)
+    }
+    fn info(&self) -> Value {
+        actor::Bank::info(self.bank())
+    }
 }

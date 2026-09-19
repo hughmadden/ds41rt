@@ -2,11 +2,15 @@
 #define DS41RT_TARGET_H
 #include <stddef.h>
 #include <stdint.h>
+#define DS41RT_TARGET_MAX_CONFIG_BYTES ((size_t)65536)
+#define DS41RT_TARGET_MAX_REPLY_BYTES ((size_t)65536)
+#define DS41RT_TARGET_MAX_COMMAND_BYTES ((size_t)16777216)
 #ifdef __cplusplus
 extern "C" {
 #endif
 /* ABI 1. All calls are thread-safe. Handles/command IDs are opaque, never pointers.
- * Inputs are copied before return. Maximum config/command/reply JSON length: 65536.
+ * Inputs are copied before return. Config/reply maximum: 65536 bytes.
+ * Command maximum: 16777216 bytes, allowing a whole 1048576-token stream prompt.
  * Status: 0 OK, 1 INVALID, 2 BUSY, 3 STALE, 4 NOT_READY,
  *         5 BUFFER_TOO_SMALL, 6 FAILED, 8 INTERNAL.
  * create starts one native CUDA owner thread. Its initialization reply has ID 0.
@@ -38,11 +42,24 @@ extern "C" {
  * must serialize admission/dispatch or add actual native group reservations.
  * submit {lane,request,expected_committed_end,work:{phase:"full_target",
  *         tokens:[u32],selected:[usize],kind:"prefill"|"decode",placement:u64}}
+ * Streaming submit uses lane:0, expected_committed_end:0 and
+ * work:{phase:"encoder_stream",tokens:[u32],chunk_rows:u32,selected:[usize]}.
+ * It requires a fresh admission and both normal contexts idle. chunk_rows is
+ * 80..configured batch_tokens (not rounded AOT capacity); selected has 1..48
+ * increasing absolute rows in [max(0,prompt_length-128),prompt_length).
+ * The whole prompt is 1..max_context_tokens, at most 1048576 tokens.
+ * Both contexts are held through encoder chunks, final decoder replay and result
+ * consumption. Bank commands/new work are BUSY while this mode is active.
+ * Streaming commit requires accepted == whole prompt length. Partial accepted
+ * counts are INVALID and preserve the result. Stream cancel (also before execute
+ * and after failure) adds revoked:true to its ACK: the entire admission is gone,
+ * so discard its request lease and do not release/reuse it. Normal actors resume
+ * only after completion/revocation; full_target cancellation is unchanged.
  * execute {ticket}, poll {ticket}, acquire_logits {ticket}
  * release_logits {ticket,lease:u64,consumer_stream:"0x..."}
  * commit {ticket,accepted:u32}, cancel {ticket}, release {request}, shutdown {}
  * ticket is the exact {request,lane,id} returned by submit. Phase-tagged work
- * allows later encoder/stream/replay descriptors; unsupported phases are rejected.
+ * supports full_target and encoder_stream; unsupported phases are rejected.
  * A reply is {command_id,ok,result} or {command_id,ok:false,code,error}.
  *
  * Producer writes are complete before ready/acquire replies.

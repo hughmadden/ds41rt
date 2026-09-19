@@ -24,8 +24,9 @@ whether the operation succeeded. At most 32 uncollected commands/replies exist.
 
 `result(handle, command_id, buffer, capacity)` returns NOT_READY until complete.
 BUFFER_TOO_SMALL reports the required size without consuming the reply. OK copies
-and consumes it; subsequent reads are STALE. The maximum JSON input/reply is
-65536 bytes, with no NUL terminator. Replies contain `command_id`, `ok`, and
+and consumes it; subsequent reads are STALE. Config and reply JSON are capped at
+65536 bytes; command JSON is capped at 16777216 bytes, with no NUL terminator.
+This fits the full 1048576-token prompt without a separate upload protocol. Replies contain `command_id`, `ok`, and
 `result`, or `command_id`, `ok:false`, `code` and `error`. Handles are never raw
 Rust pointers; destroyed handles and foreign/old tickets cannot address resources.
 
@@ -87,6 +88,35 @@ consumed, committed, cancelled and failed; terminal tickets remain queryable unt
 that lane admits its next batch. `device_pointer` and stream handles use hex strings
 so no JSON number conversion can truncate pointers.
 
+Encoder-stream work is `{phase:"encoder_stream",tokens:[u32],chunk_rows:u32,
+selected:[usize]}` with outer `lane:0` and `expected_committed_end:0`. It requires
+a fresh admission and both normal contexts idle. The prompt has 1–1048576 tokens,
+bounded by the configured model context. Chunk size is 80 through the requested
+`batch_tokens`, not any larger AOT-rounded storage capacity. Select 1–48 strictly
+increasing absolute rows from the prompt's final 128 rows (or all rows for shorter
+prompts). Descriptor `selected` stays absolute; native replay-relative selection
+metadata is normalized without copying the device logits.
+
+The controller ends and joins its idle normal lane actors before entering the
+stream scope, releasing their split borrows. The native outer loop then calls
+retained `NativeTarget::stream_prefill`, borrowing the whole target through encoder
+chunks, final-window decoder replay, and the shared consumer-fence result scope.
+No other target work or bank command enters until that scope ends; these commands
+return BUSY. Polling/cancellation and the standard logits handshake continue.
+Normal actors and their retained fences resume afterward, without reloading weights,
+allocating another bank or resetting ticket identities.
+
+Stream commit accepts the entire prompt length only. Partial counts are INVALID
+and preserve ready/consumed results. Stream cancellation before execute, during
+encoder/replay, after failure or after result consumption revokes the entire
+admission; its ACK adds `revoked:true`. Discard both ticket and request lease;
+never issue a subsequent release for that revoked request. This differs from
+normal full-target cancellation, which preserves the request's previous accepted
+frontier. The native facade may revoke while reporting execution failure; the
+caller retains its request identity until the explicit cancellation receipt. A
+new admission receives a new generation. Held/draining external logits still
+block cancellation; no timeout bypasses the consumer fence.
+
 Bank snapshots contain `owner`, `capacity_rows`, four `source_page_capacity`,
 four `source_pages_free`, `source_payload_bytes` and `cache_bytes`. Every snapshot
 reads the attached real bank. The required constructor field
@@ -112,9 +142,9 @@ before allowing unrelated allocation. Arbitrary concurrent unrelated admission
 needs an actual native reservation/group-admission extension. This packet makes
 no guarantee that a standalone capacity query reserves future pages.
 
-Full-target C ABI work is implemented. The retained encoder-stream/final-decoder
-facade is separately callable in Rust and GPU-smoke-tested, but the C actor still
-needs a quiescent mode switch that holds both contexts. No separate native cache
+Full-target and encoder-stream/final-decoder C ABI work are implemented. The
+retained streaming Rust facade passed GPU smoke tests; the new exclusive C ABI
+mode still needs its own live external-consumer qualification. No separate native cache
 initialization stage, vLLM prefix-cache mapping, multimodal/dSpark commands or
 serving activation is implemented here. No full-vocabulary host-copy operation
 is exposed; the existing Rust diagnostic probe is separate from serving.
@@ -131,14 +161,28 @@ reply consumption, bounded admission, nondestructive buffer-capacity errors,
 aggregate capacity exhaustion and corrected accepted-count retries. Native Rust
 lease/streaming tests and compile-fail lifetime checks run alongside them.
 
-Validation for this packet: 42 `native_executor` tests passed, including 10 C ABI
+Validation for this packet: 48 `native_executor` tests passed, including 16 C ABI
 cases; five rustdoc lifetime checks passed. Offline checks cover the library,
 binaries and examples. The development cdylib builds with the existing lockfile.
 The actual package Python client loaded the cdylib, received the asynchronous
 missing-native-library initialization failure and explicitly destroyed the exited
 owner on CPU; it did not load a CUDA library or contact expert peers.
 
-The C ABI itself has not yet been GPU-qualified. The preceding retained Rust
-full-target and encoder-stream probes passed on the fleet; those receipts establish
-the native executor seam, not external CUDA-consumer ordering or vLLM serving.
-No throughput claim is made from CPU stubs or development-profile GPU probes.
+On 19 September 2026 at 09:57 AEST the campaign parent ran package `dff621b`
+against the full-target C ABI at `0dad275c` on the fleet: both contexts matched
+full-vocabulary prefill/decode golden hashes, Torch views shared native logits
+storage, real consumer streams completed through native event ACKs, held-result
+commit guards worked, canceling the second decode left ends `[11,10]`, source
+credits returned, and close completed. This qualifies that bounded full-target
+external-consumer path. The new encoder-stream C ABI mode still needs a live
+probe; its preceding retained Rust streaming facade already passed GPU tests.
+No throughput or general vLLM serving claim is made from these correctness probes.
+
+Streaming CPU cases use the actual mode switch, controller, result-scope fence,
+and native `SourcePages` in the fake device. They prove occupied-context rejection,
+full-target → stream → decode reentry, cancellation before execute/during encode/
+during replay, failed-stage revocation receipts, source-credit restoration,
+delayed external consumer exclusion, absolute selected-row metadata, non-destructive
+partial-commit rejection, invalid-input admission preservation, and a full
+1048576-token command through the C boundary. These complement the retained
+`StreamSession` lifecycle tests; they do not simulate GPU throughput.

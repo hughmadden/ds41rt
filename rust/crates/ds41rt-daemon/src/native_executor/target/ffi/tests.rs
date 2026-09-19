@@ -13,6 +13,7 @@ struct Control {
     records: [AtomicUsize; 2],
     drains: [AtomicUsize; 2],
     dropped: AtomicUsize,
+    stream_stage: AtomicUsize,
 }
 impl Control {
     fn new() -> Self {
@@ -23,6 +24,7 @@ impl Control {
             records: Default::default(),
             drains: Default::default(),
             dropped: AtomicUsize::new(0),
+            stream_stage: AtomicUsize::new(0),
         }
     }
 }
@@ -218,7 +220,7 @@ struct Fixture {
 fn fixture() -> Fixture {
     static OWNER: AtomicU64 = AtomicU64::new(1000);
     let owner = OWNER.fetch_add(1, Ordering::SeqCst);
-    let (client, receive) = Client::pair();
+    let (client, mut receive) = Client::pair();
     let control = Arc::new(Control::new());
     let (c, signals) = (client.clone(), control.clone());
     let thread = std::thread::spawn(move || {
@@ -247,8 +249,7 @@ fn fixture() -> Fixture {
                     4,
                 )
             });
-            let [first, second] = &mut contexts;
-            let fences = std::array::from_fn(|lane| FakeFence {
+            let mut fences = std::array::from_fn(|lane| FakeFence {
                 control: signals.clone(),
                 lane,
             });
@@ -260,13 +261,34 @@ fn fixture() -> Fixture {
                 0,
                 Ok(json!({"state":"initialized","bank":actor::Bank::info(&bank)})),
             );
-            runtime.block_on(actor::run(
-                &bank,
-                [first, second],
-                fences,
-                c.clone(),
-                receive,
-            ))
+            loop {
+                let next = {
+                    let [first, second] = &mut contexts;
+                    runtime.block_on(actor::run(
+                        &bank,
+                        [first, second],
+                        &mut fences,
+                        c.clone(),
+                        &mut receive,
+                    ))?
+                };
+                match next {
+                    actor::Exit::Shutdown(id) => return Ok(id),
+                    actor::Exit::Stream(message) => {
+                        let mut target = FakeStream {
+                            bank: &bank,
+                            control: &signals,
+                        };
+                        runtime.block_on(stream::run(
+                            &mut target,
+                            message,
+                            &mut fences[0],
+                            c.clone(),
+                            &mut receive,
+                        ))?;
+                    }
+                }
+            }
         })();
         c.finish(result);
     });
@@ -669,5 +691,347 @@ fn simultaneous_callers_cannot_prepare_two_batches_on_one_lane() {
     assert_eq!(replies.iter().filter(|r| r["code"] == BUSY).count(), 1);
     let winner = replies.iter().find(|r| r["ok"] == true).unwrap()["result"]["ticket"].clone();
     rpc(f.handle, json!({"op":"cancel","ticket":winner}));
+    close(f);
+}
+
+struct FakeStream<'a> {
+    bank: &'a FakeBank,
+    control: &'a Arc<Control>,
+}
+struct StreamGuard<'a> {
+    bank: &'a FakeBank,
+    control: &'a Arc<Control>,
+    request: RequestHandle,
+    reads: Vec<SourcePrefix>,
+    armed: bool,
+}
+impl Drop for StreamGuard<'_> {
+    fn drop(&mut self) {
+        self.reads.clear();
+        if self.armed {
+            for lane in 0..2 {
+                self.control.drains[lane].fetch_add(1, Ordering::SeqCst);
+            }
+            actor::Bank::release(self.bank, self.request).unwrap();
+        }
+    }
+}
+struct FakeReady<'a> {
+    guard: StreamGuard<'a>,
+    rows: usize,
+    values: Vec<f32>,
+    selected: Vec<usize>,
+    positions: Vec<u64>,
+}
+impl stream::Output for FakeReady<'_> {
+    fn logits(&self) -> Result<Logits<'_>> {
+        Ok(Logits {
+            rows: self.selected.len(),
+            selected: &self.selected,
+            positions: &self.positions,
+            device: None,
+            host: Some(&self.values),
+        })
+    }
+    fn commit(mut self) -> Result<u64> {
+        self.guard.reads.clear();
+        let mut p = self.guard.bank.physical.borrow_mut();
+        let slot = self.guard.request.slot();
+        let plans = (0..4)
+            .map(|s| {
+                p.pages[s].reserve(&[(
+                    slot,
+                    p.pages[s].committed_rows(slot)?,
+                    self.rows / if s == 3 { 1 } else { 2 },
+                )])
+            })
+            .collect::<Result<Vec<_>>>()?;
+        for (s, plan) in plans.into_iter().enumerate() {
+            p.pages[s].apply(plan);
+        }
+        p.ends[slot] = Some(self.rows as u64);
+        self.guard.armed = false;
+        Ok(self.rows as u64)
+    }
+    fn cancel(self) -> Result<()> {
+        drop(self);
+        Ok(())
+    }
+}
+impl stream::Backend for FakeStream<'_> {
+    type Ready<'a>
+        = FakeReady<'a>
+    where
+        Self: 'a;
+    fn identity(&self, input: &StreamInput) -> Result<Ticket> {
+        input.validate(80, 1048576)?;
+        self.bank.active.idle(input.request)?;
+        ensure!(
+            actor::Bank::end(self.bank, input.request)? == 0,
+            "stream requires fresh request"
+        );
+        self.bank.active.identity(input.request, 0)
+    }
+    async fn execute<'a>(&'a mut self, input: StreamInput) -> Result<Self::Ready<'a>> {
+        // Emulate one internally published encoder source row with the retained
+        // physical page algorithm. This is not an accepted full-model frontier.
+        let slot = input.request.slot();
+        {
+            let mut p = self.bank.physical.borrow_mut();
+            let plan = p.pages[3].reserve(&[(slot, 0, 1)])?;
+            p.pages[3].apply(plan);
+            p.ends[slot] = Some(1);
+        }
+        let reads = {
+            let p = self.bank.physical.borrow();
+            p.pages
+                .iter()
+                .map(|s| s.retain_prefix(slot, s.committed_rows(slot)?))
+                .collect::<Result<Vec<_>>>()?
+        };
+        let guard = StreamGuard {
+            bank: self.bank,
+            control: self.control,
+            request: input.request,
+            reads,
+            armed: true,
+        };
+        self.control.stream_stage.store(1, Ordering::SeqCst);
+        while !self.control.execute[0].load(Ordering::SeqCst) {
+            tokio::task::yield_now().await;
+        }
+        ensure!(
+            !self.control.fail[0].load(Ordering::SeqCst),
+            "controlled encoder failure"
+        );
+        self.control.stream_stage.store(2, Ordering::SeqCst);
+        while !self.control.execute[1].load(Ordering::SeqCst) {
+            tokio::task::yield_now().await;
+        }
+        ensure!(
+            !self.control.fail[1].load(Ordering::SeqCst),
+            "controlled replay failure"
+        );
+        let start = input.tokens.len().saturating_sub(128);
+        let values = input
+            .selected
+            .iter()
+            .flat_map(|&r| std::iter::repeat_n(input.tokens[r] as f32, 129280))
+            .collect();
+        self.control.stream_stage.store(3, Ordering::SeqCst);
+        Ok(FakeReady {
+            guard,
+            rows: input.tokens.len(),
+            values,
+            selected: input.selected.iter().map(|r| r - start).collect(),
+            positions: input.selected.iter().map(|&r| r as u64).collect(),
+        })
+    }
+    fn revoke(&self, request: RequestHandle) -> Result<()> {
+        if actor::Bank::end(self.bank, request).is_ok() {
+            actor::Bank::release(self.bank, request)?;
+        }
+        Ok(())
+    }
+    fn info(&self) -> Value {
+        actor::Bank::info(self.bank)
+    }
+}
+fn stream_work(request: &Value, rows: usize) -> Value {
+    json!({"op":"submit","lane":0,"request":request,
+    "expected_committed_end":0,"work":{"phase":"encoder_stream","tokens":vec![42;rows],"chunk_rows":80,"selected":[rows-1]}})
+}
+fn stage(f: &Fixture, wanted: usize) {
+    let deadline = Instant::now() + Duration::from_secs(5);
+    while f.control.stream_stage.load(Ordering::SeqCst) != wanted {
+        assert!(Instant::now() < deadline);
+        std::thread::yield_now();
+    }
+}
+
+#[test]
+fn streaming_mode_rejects_occupied_context_then_returns_to_full_target_after_commit() {
+    let f = fixture();
+    let a = admit(&f, 0);
+    let b = admit(&f, 1);
+    let normal = prepared(&f, 1, &b, &[3]);
+    error(f.handle, stream_work(&a, 370), BUSY);
+    rpc(f.handle, json!({"op":"cancel","ticket":normal}));
+    let x = rpc(f.handle, stream_work(&a, 370))["ticket"].clone();
+    error(
+        f.handle,
+        json!({"op":"submit","lane":1,"request":b,"expected_committed_end":0,
+        "work":{"phase":"full_target","tokens":[3],"selected":[0],"kind":"prefill","placement":1}}),
+        BUSY,
+    );
+    execute(&f, &x);
+    error(
+        f.handle,
+        json!({"op":"commit","ticket":x,"accepted":128}),
+        INVALID,
+    );
+    assert_eq!(
+        rpc(f.handle, json!({"op":"commit","ticket":x,"accepted":370}))["committed_end"],
+        370
+    );
+    let y = rpc(
+        f.handle,
+        json!({"op":"submit","lane":0,"request":a,"expected_committed_end":370,
+        "work":{"phase":"full_target","tokens":[8],"selected":[0],"kind":"decode","placement":1}}),
+    )["ticket"]
+        .clone();
+    assert_ne!(x["id"], y["id"]);
+    execute(&f, &y);
+    assert_eq!(
+        rpc(f.handle, json!({"op":"commit","ticket":y,"accepted":1}))["committed_end"],
+        371
+    );
+    close(f);
+}
+#[test]
+fn streaming_cancellation_before_execute_encoder_and_replay_revokes_generation_and_credits() {
+    for checkpoint in [0, 1, 2] {
+        let f = fixture();
+        let a = admit(&f, 0);
+        let before = rpc(f.handle, json!({"op":"info"}))["bank"].clone();
+        if checkpoint > 0 {
+            f.control.execute[checkpoint - 1].store(false, Ordering::SeqCst);
+        }
+        let x = rpc(f.handle, stream_work(&a, 370))["ticket"].clone();
+        if checkpoint > 0 {
+            rpc(f.handle, json!({"op":"execute","ticket":x}));
+            stage(&f, checkpoint);
+        }
+        assert_eq!(
+            rpc(f.handle, json!({"op":"cancel","ticket":x}))["revoked"],
+            true
+        );
+        assert_eq!(rpc(f.handle, json!({"op":"info"}))["bank"], before);
+        error(f.handle, json!({"op":"release","request":a}), FAILED);
+        let fresh = admit(&f, 0);
+        assert_ne!(fresh["generation"], a["generation"]);
+        let y = prepared(&f, 1, &fresh, &[4]);
+        rpc(f.handle, json!({"op":"cancel","ticket":y}));
+        close(f);
+    }
+}
+#[test]
+fn streaming_logits_fence_normalizes_selection_and_retains_both_contexts_until_cancel() {
+    let f = fixture();
+    let a = admit(&f, 0);
+    let x = rpc(f.handle, stream_work(&a, 370))["ticket"].clone();
+    execute(&f, &x);
+    let lease = rpc(f.handle, json!({"op":"acquire_logits","ticket":x}));
+    assert_eq!(lease["selected"], json!([369]));
+    assert_eq!(lease["positions"], json!([369]));
+    error(f.handle, json!({"op":"cancel","ticket":x}), BUSY);
+    error(
+        f.handle,
+        json!({"op":"admit","slot":1,"request_id":88}),
+        BUSY,
+    );
+    f.control.consumer[0].store(false, Ordering::SeqCst);
+    let release = submit(
+        f.handle,
+        json!({"op":"release_logits","ticket":x,"lease":lease["lease"],"consumer_stream":"0x1234"}),
+    );
+    state(&f, &x, "consumer_draining");
+    assert_eq!(f.control.drains[0].load(Ordering::SeqCst), 0);
+    f.control.consumer[0].store(true, Ordering::SeqCst);
+    collect(f.handle, release);
+    error(
+        f.handle,
+        json!({"op":"commit","ticket":x,"accepted":128}),
+        INVALID,
+    );
+    state(&f, &x, "consumed");
+    assert_eq!(
+        rpc(f.handle, json!({"op":"cancel","ticket":x}))["revoked"],
+        true
+    );
+    assert_eq!(
+        rpc(f.handle, json!({"op":"info"}))["bank"]["source_pages_free"],
+        json!([8, 8, 8, 8])
+    );
+    close(f);
+}
+#[test]
+fn failed_encoder_and_replay_require_revoked_cancellation_receipt_before_reentry() {
+    for checkpoint in 0..2 {
+        let f = fixture();
+        let a = admit(&f, 0);
+        f.control.fail[checkpoint].store(true, Ordering::SeqCst);
+        let x = rpc(f.handle, stream_work(&a, 370))["ticket"].clone();
+        rpc(f.handle, json!({"op":"execute","ticket":x}));
+        state(&f, &x, "failed");
+        error(
+            f.handle,
+            json!({"op":"acquire_logits","ticket":x}),
+            NOT_READY,
+        );
+        assert_eq!(
+            rpc(f.handle, json!({"op":"cancel","ticket":x}))["revoked"],
+            true
+        );
+        assert_eq!(
+            rpc(f.handle, json!({"op":"info"}))["bank"]["source_pages_free"],
+            json!([8, 8, 8, 8])
+        );
+        let fresh = admit(&f, 0);
+        let y = prepared(&f, 0, &fresh, &[1]);
+        rpc(f.handle, json!({"op":"cancel","ticket":y}));
+        close(f);
+    }
+}
+#[test]
+fn whole_million_token_stream_fits_command_bound_without_increasing_reply_or_config_bound() {
+    let f = fixture();
+    let a = admit(&f, 0);
+    let mut work = stream_work(&a, 1048576);
+    work["work"]["tokens"] = json!(vec![129279u32; 1048576]);
+    let encoded = serde_json::to_vec(&work).unwrap();
+    assert!(encoded.len() > MAX_JSON && encoded.len() < MAX_COMMAND);
+    let id = submit(f.handle, work);
+    let x = collect(f.handle, id)["result"]["ticket"].clone();
+    assert_eq!(
+        rpc(f.handle, json!({"op":"cancel","ticket":x}))["revoked"],
+        true
+    );
+    let mut handle = 0;
+    assert_eq!(
+        unsafe { ds41rt_target_create(encoded.as_ptr(), encoded.len(), &mut handle) },
+        INVALID
+    );
+    close(f);
+}
+
+#[test]
+fn invalid_stream_input_preserves_fresh_admission_and_normal_mode_reentry() {
+    let f = fixture();
+    let a = admit(&f, 0);
+    for field in ["chunk_rows", "selected", "tokens"] {
+        let mut work = stream_work(&a, 370);
+        work["work"][field] = match field {
+            "chunk_rows" => json!(81), // AOT storage may cover more; requested budget does not.
+            "selected" => json!([241]), // First permitted row is 242.
+            _ => json!([129280]),
+        };
+        error(f.handle, work, FAILED);
+        assert_eq!(
+            rpc(f.handle, json!({"op":"info","request":a}))["committed_end"],
+            0
+        );
+    }
+    let mut wrong_lane = stream_work(&a, 370);
+    wrong_lane["lane"] = json!(1);
+    error(f.handle, wrong_lane, INVALID);
+    let x = prepared(&f, 1, &a, &[8]);
+    execute(&f, &x);
+    rpc(f.handle, json!({"op":"commit","ticket":x,"accepted":1}));
+    error(f.handle, stream_work(&a, 370), FAILED);
+    assert_eq!(
+        rpc(f.handle, json!({"op":"info","request":a}))["committed_end"],
+        1
+    );
     close(f);
 }

@@ -13,11 +13,11 @@ pub(super) trait Fence {
     fn record(&mut self, consumer_stream: usize) -> Result<()>;
     fn ready(&self) -> Result<bool>;
 }
-enum LaneMessage {
+pub(super) enum LaneMessage {
     Command(Message),
     Stop,
 }
-fn active(slot: &Slot) -> bool {
+pub(super) fn active(slot: &Slot) -> bool {
     slot.pending
         || matches!(
             slot.phase,
@@ -30,7 +30,7 @@ fn active(slot: &Slot) -> bool {
                 | "failed"
         )
 }
-fn reserve(client: &Client, message: &Message) -> Api<usize> {
+pub(super) fn reserve(client: &Client, message: &Message) -> Api<usize> {
     let lane = message
         .command
         .lane()
@@ -89,17 +89,22 @@ fn reserve(client: &Client, message: &Message) -> Api<usize> {
     }
     Ok(lane)
 }
-fn clear_pending(client: &Client, lane: usize) {
+pub(super) fn clear_pending(client: &Client, lane: usize) {
     client.state.lock().expect("client state").slots[lane].pending = false;
+}
+
+pub(super) enum Exit {
+    Shutdown(u64),
+    Stream(Message),
 }
 
 pub(super) async fn run<B: Bank, D: TargetDriver, F: Fence>(
     bank: &B,
     contexts: [&mut TargetContext<D>; 2],
-    fences: [F; 2],
+    fences: &mut [F; 2],
     client: Arc<Client>,
-    receive: mpsc::Receiver<Message>,
-) -> Result<u64> {
+    receive: &mut mpsc::Receiver<Message>,
+) -> Result<Exit> {
     let (tx0, rx0) = mpsc::channel(LIMIT);
     let (tx1, rx1) = mpsc::channel(LIMIT);
     let [first, second] = contexts;
@@ -115,12 +120,38 @@ pub(super) async fn run<B: Bank, D: TargetDriver, F: Fence>(
 async fn control<B: Bank>(
     bank: &B,
     client: Arc<Client>,
-    mut receive: mpsc::Receiver<Message>,
+    receive: &mut mpsc::Receiver<Message>,
     lanes: [mpsc::Sender<LaneMessage>; 2],
-) -> Result<u64> {
+) -> Result<Exit> {
     while let Some(message) = receive.recv().await {
         let id = message.id;
         match &message.command {
+            Command::Submit {
+                lane,
+                work: Work::EncoderStream { .. },
+                ..
+            } => {
+                if *lane != 0 {
+                    client.reply(id, Err(fail(INVALID, "encoder stream must use lane zero")));
+                } else if client
+                    .state
+                    .lock()
+                    .expect("client state")
+                    .slots
+                    .iter()
+                    .any(active)
+                {
+                    client.reply(
+                        id,
+                        Err(fail(BUSY, "encoder stream requires both contexts idle")),
+                    );
+                } else {
+                    for lane in &lanes {
+                        let _ = lane.send(LaneMessage::Stop).await;
+                    }
+                    return Ok(Exit::Stream(message));
+                }
+            }
             Command::Poll { ticket } => client.reply(id, client.poll(*ticket)),
             Command::Info { request } => {
                 let end = request
@@ -204,7 +235,7 @@ async fn control<B: Bank>(
                     for lane in &lanes {
                         let _ = lane.send(LaneMessage::Stop).await;
                     }
-                    return Ok(id); // final ACK is sent only after with_target drops native owners
+                    return Ok(Exit::Shutdown(id)); // final ACK is sent only after with_target drops native owners
                 }
             }
             _ => match reserve(&client, &message) {
@@ -225,17 +256,17 @@ async fn control<B: Bank>(
     anyhow::bail!("native command channel closed without shutdown")
 }
 
-enum Finish {
+pub(super) enum Finish {
     Commit(Message, u32),
     Cancel(Message),
 }
 
 /// The descriptor escapes only while this function retains the actual Rust
 /// Logits borrow. No mutable context operation is possible inside this scope.
-async fn result_scope<F: Fence>(
+pub(super) async fn result_scope<F: Fence>(
     output: Logits<'_>,
     ticket: Ticket,
-    proposed_rows: usize,
+    accepted_range: std::ops::RangeInclusive<usize>,
     fence: &mut F,
     client: &Client,
     receive: &mut mpsc::Receiver<LaneMessage>,
@@ -313,9 +344,12 @@ async fn result_scope<F: Fence>(
                 );
             }
             Command::Commit { accepted, .. } if lease.is_none() => {
-                if *accepted as usize > proposed_rows {
+                if !accepted_range.contains(&(*accepted as usize)) {
                     clear_pending(client, ticket.lane);
-                    client.reply(id, Err(fail(INVALID, "accepted rows exceed target batch")));
+                    client.reply(
+                        id,
+                        Err(fail(INVALID, "accepted rows outside work contract")),
+                    );
                     continue;
                 }
                 let accepted = *accepted;
@@ -333,7 +367,7 @@ async fn result_scope<F: Fence>(
 async fn lane<B: Bank, D: TargetDriver, F: Fence>(
     bank: &B,
     context: &mut TargetContext<D>,
-    mut fence: F,
+    fence: &mut F,
     client: Arc<Client>,
     mut receive: mpsc::Receiver<LaneMessage>,
 ) {
@@ -357,7 +391,10 @@ async fn lane<B: Bank, D: TargetDriver, F: Fence>(
             selected,
             kind,
             placement,
-        } = work;
+        } = work
+        else {
+            unreachable!("stream work switches out of lane actors");
+        };
         let prepared = (|| -> Api<Ticket> {
             let end = bank.end(request).map_err(native_error)?;
             if end != expected_committed_end {
@@ -448,8 +485,8 @@ async fn lane<B: Bank, D: TargetDriver, F: Fence>(
         let action = result_scope(
             output,
             ticket,
-            proposed_rows,
-            &mut fence,
+            0..=proposed_rows,
+            fence,
             &client,
             &mut receive,
         )

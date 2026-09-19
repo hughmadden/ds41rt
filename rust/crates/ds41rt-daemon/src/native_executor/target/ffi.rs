@@ -15,6 +15,7 @@ use std::{
 use tokio::sync::mpsc;
 mod actor;
 mod native;
+mod stream;
 
 const OK: i32 = 0;
 const INVALID: i32 = 1;
@@ -26,6 +27,7 @@ const FAILED: i32 = 6;
 const INTERNAL: i32 = 8;
 const LIMIT: usize = 32;
 const MAX_JSON: usize = 65536;
+const MAX_COMMAND: usize = 16 * 1024 * 1024;
 type Error = (i32, String);
 type Api<T> = std::result::Result<T, Error>;
 fn fail(code: i32, message: impl Into<String>) -> Error {
@@ -74,6 +76,11 @@ enum Work {
         selected: Vec<usize>,
         kind: Kind,
         placement: u64,
+    },
+    EncoderStream {
+        tokens: Vec<u32>,
+        chunk_rows: usize,
+        selected: Vec<usize>,
     },
 }
 #[derive(Deserialize)]
@@ -326,8 +333,8 @@ fn guarded(action: impl FnOnce() -> Api<()>) -> i32 {
         Err(_) => INTERNAL,
     }
 }
-unsafe fn bytes<'a>(p: *const u8, len: usize) -> Api<&'a [u8]> {
-    if p.is_null() || len == 0 || len > MAX_JSON {
+unsafe fn bytes<'a>(p: *const u8, len: usize, limit: usize) -> Api<&'a [u8]> {
+    if p.is_null() || len == 0 || len > limit {
         return Err(fail(INVALID, "invalid input buffer"));
     }
     Ok(unsafe { slice::from_raw_parts(p, len) })
@@ -347,7 +354,7 @@ pub unsafe extern "C" fn ds41rt_target_create(p: *const u8, len: usize, out: *mu
         unsafe {
             *out = 0;
         }
-        let config: Config = serde_json::from_slice(unsafe { bytes(p, len)? })
+        let config: Config = serde_json::from_slice(unsafe { bytes(p, len, MAX_JSON)? })
             .map_err(|e| fail(INVALID, e.to_string()))?;
         config.validate()?;
         let (c, receive) = Client::pair();
@@ -382,7 +389,7 @@ pub unsafe extern "C" fn ds41rt_target_command(
         unsafe {
             *out = 0;
         }
-        let id = client(handle)?.enqueue(unsafe { bytes(p, len)? })?;
+        let id = client(handle)?.enqueue(unsafe { bytes(p, len, MAX_COMMAND)? })?;
         unsafe {
             *out = id;
         }

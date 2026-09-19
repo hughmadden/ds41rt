@@ -173,6 +173,7 @@ pub struct NativeTarget<'s, 'w, 'a> {
     contexts: [TargetContext<NativeDriver<'s, 'w, 'a>>; 2],
     bank: NativeBank<'s, 'a>,
     runtime: &'s tokio::runtime::Runtime,
+    stream_chunk_rows: usize,
 }
 impl<'s, 'w, 'a> NativeTarget<'s, 'w, 'a> {
     pub fn bank(&self) -> &NativeBank<'s, 'a> { &self.bank }
@@ -252,7 +253,7 @@ pub fn with_target<R>(config: TargetConfig,
                 * (68 + ds41rt_ffi::V41Kv::COMPRESSED_ROW_BYTES),
             cache_bytes: parts.cache_bytes,
         } };
-        run(NativeTarget { bank, runtime: parts.runtime, contexts: [
+        run(NativeTarget { bank, runtime: parts.runtime, stream_chunk_rows: args.prefill_batch_tokens as usize, contexts: [
             TargetContext::new(first, active.clone(), 0, parts.capacity as usize, 48),
             TargetContext::new(second, active, 1, parts.capacity as usize, 48),
         ] })

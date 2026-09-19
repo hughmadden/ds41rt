@@ -59,12 +59,16 @@ impl Active {
         ensure!(!self.tickets.borrow().iter().any(|t| t.request == request), "request has a live target batch");
         Ok(())
     }
+    fn identity(&self, request: RequestHandle, lane: usize) -> Result<Ticket> {
+        self.healthy()?;
+        let id = self.next.get().checked_add(1).context("target ticket exhausted")?;
+        self.next.set(id);
+        Ok(Ticket { request, lane, id })
+    }
     fn claim(&self, request: RequestHandle, lane: usize) -> Result<Ticket> {
         self.idle(request)?;
         ensure!(!self.tickets.borrow().iter().any(|t| t.lane == lane), "target lane busy");
-        let id = self.next.get().checked_add(1).context("target ticket exhausted")?;
-        self.next.set(id);
-        let ticket = Ticket { request, lane, id };
+        let ticket = self.identity(request, lane)?;
         self.tickets.borrow_mut().push(ticket);
         Ok(ticket)
     }

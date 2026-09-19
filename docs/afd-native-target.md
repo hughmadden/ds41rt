@@ -6,8 +6,10 @@ Serving integration remains disabled. The retained native Rust probe at
 `c6e7bafa` passed two-context GPU prefill, one-token decode and cancellation;
 all 129280 logits were byte-identical between contexts and source credits
 returned after release. This is a correctness smoke, not a throughput result.
-The new C ABI has separate CPU lifetime tests; its GPU/Python consumer path
-still needs live qualification.
+The full-target C ABI at `0dad275c` subsequently passed a real Python/Torch CUDA
+consumer probe (package `dff621b`, 19 September 2026 09:57 AEST): golden hashes,
+consumer fences, cancellation, credits and teardown passed. The new streaming
+C ABI mode has separate CPU lifetime tests and still needs live qualification.
 
 `native_executor::target::with_target(config, callback)` loads the native library
 and coordinator weights using the original one-RTX constructor, then supplies
@@ -82,10 +84,10 @@ whose `BackboneCache` owns real `SourceCache` allocations and the canonical
 prefix dictionary. Only the two scheduling tickets are tracked outside the bank.
 Never construct the schema-1 `CacheCommands` metadata prototype beside it.
 
-Full target execution is the C ABI's current bound. The separate
-[streaming facade](afd-native-streaming.md) now exposes retained encoder chunks
-and final-decoder replay in Rust and passed bounded GPU probes. The actor still
-needs a quiescent mode switch to call it while holding both contexts. Prefix
+The C ABI exposes full target execution and an exclusive encoder-stream mode.
+The retained [streaming facade](afd-native-streaming.md) passed bounded GPU probes;
+the new actor mode switch uses that facade while holding both contexts through
+result consumption. This C ABI streaming mode still needs live qualification. Prefix
 snapshots, image inputs and dSpark transactions are not bound here. The full-target
 interface rejects encoder/replay-stage requests. No native sampler is exposed;
 the vLLM adapter must consume logits using its existing sampling semantics.
