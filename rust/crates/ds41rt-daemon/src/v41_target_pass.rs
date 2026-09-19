@@ -401,6 +401,12 @@ impl<'w, 'a> TargetPass<'w, 'a> {
                 std::env::var("DS41RT_ACTIVATION_TRACE_DETAIL_LAYER").ok()
                     .and_then(|value| value.parse::<usize>().ok()) == Some(layer)
             });
+            // Arm the one-shot sparse-input capture at the selected detail
+            // layer and clear it at every other layer. The wave consumes the
+            // trigger on entry to its next staged execution, so a skipped or
+            // failed execution can never leak the capture into later work.
+            self.lane.set_sparse_input_trace(
+                detail_trace.map(|(directory, _)| directory.as_path()));
             if layer != stage.windows().start {
                 let prepare_timing = Instant::now();
                 self.lane.advance()?;

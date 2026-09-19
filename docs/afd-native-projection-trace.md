@@ -110,3 +110,51 @@ selection and manifest extents. The existing native executor tests cover grouped
 consumer/commit/cancel ownership. These diagnostics synchronize D2H reads: full
 logit hashes must still match the untraced replay before using the captures, and
 traced timings must not be used for performance comparisons.
+
+## Sparse attention native operand capture — 19 September 2026 AEST
+
+The same `DS41RT_ACTIVATION_TRACE_DIR` + `DS41RT_ACTIVATION_TRACE_POSITION` +
+`DS41RT_ACTIVATION_TRACE_DETAIL_LAYER` selection now also captures the exact
+native operands of that layer's sparse-attention invocation. The target pass
+arms a one-shot trigger on the lane's sparse wave at the detail layer and
+clears it at every layer; the wave consumes the trigger on entry to its staged
+execution and, when armed, synchronizes its own stream after every query,
+descriptor, metadata and bounds upload is queued — before tail preparation,
+warmup, graph capture or launch, so the copies can never run inside a CUDA
+graph capture. With the trigger unset there is no extra synchronization, no
+device-to-host copy and no new allocation; cached and cold (deferred warmup)
+paths are both covered because the capture sits before the graph-cache lookup.
+A capture that would exceed 64 MiB fails explicitly instead of dumping pools
+or truncating.
+
+Each selected batch directory additionally contains (`layerN` is the detail
+layer, `requestS` the member slot in native concatenation order; members.json
+binds slots to real request IDs):
+
+| File | Exact native contents |
+| --- | --- |
+| `layerN-attention-query.bin` | Live BF16 `[rows,64,512]` rotated queries |
+| `layerN-attention-sink.bin` | FP32 `[64]` finite sink |
+| `layerN-attention-metadata.bin` | Device U64 `[rows,10]` window+source metadata |
+| `layerN-attention-selected.bin` | Device I32 `[rows,512]` selection, when a source is present |
+| `layerN-attention-replay-begins.bin` | Batch bounds upload U64 `[rows]`, descriptor-batch launches only |
+| `layerN-attention-descriptors-device.bin` / `-host.bin` | Actual GPU descriptor bytes and the staged host bytes, batch only, compared as bytes |
+| `layerN-attention-requestS-ring-values.bin` / `-ring-scales.bin` | FP8 E4M3 values `[128,512]` and E8M0 group scales `[128,16]` of the ring |
+| `layerN-attention-requestS-window-end.bin` | Actual device U64 window end scalar |
+| `layerN-attention-requestS-window-proposal-values.bin` / `-scales.bin` | Private window proposal at its live capacity |
+| `layerN-attention-requestS-source-pages.bin` | Device U32 page table `[page_stride]` |
+| `layerN-attention-requestS-source-end.bin` | Actual device U64 source end scalar |
+| `layerN-attention-requestS-source-proposal-values.bin` / `-scales.bin` | Private source proposal at its live capacity (FP4 values, E4M3 scales) |
+| `layerN-attention-requestS-source-referenced-values.bin` / `-scales.bin` | Only the committed physical rows actually referenced: packed 256-byte FP4 rows and 32-byte scale rows in ascending physical order |
+| `layerN-attention-inputs.json` | Manifest: launch kind, width, parts, per-request IDs/positions/flattened row ranges, capacities, dtypes, strides, byte offsets, actual window/source end and replay values, the logical→physical map, and per-mask skip counts |
+
+Requests without an uploaded bounds slice get an all-zeros replay-begins file
+marked `"synthetic": "explicit_zero"` (the launch passes no bounds pointer and
+the buffer is never read). Referenced-row resolution duplicates the kernel's
+`locate` masks exactly: only `0 <= id < m[5]`, `id < m[6]`, `id <
+page_stride*256` with `physical = pages[id/256]*256 + id%256 <
+source_capacity` rows are captured; masked, past-length, private-overlay,
+past-stride and past-capacity slots stay in the full selected buffer and are
+accounted in the manifest so nothing is silently dropped. The shared compressed
+source pool is never dumped whole; raw unused ring/proposal padding is unscored.
+All files use `create_new` and refuse replacement.

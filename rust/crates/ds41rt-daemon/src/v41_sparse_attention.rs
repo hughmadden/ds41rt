@@ -11,6 +11,9 @@ use ds41rt_ffi::{
 };
 use std::{collections::VecDeque, ffi::c_void, marker::PhantomData};
 
+mod input_trace;
+use input_trace::{InputTraceTrigger, RequestProvenance, WaveOperandBuffers};
+
 pub(crate) struct AttentionRequest<'a> {
     pub window: &'a WindowProposal<'a>,
     pub source: Option<&'a IndexProposal<'a>>,
@@ -76,6 +79,9 @@ pub(crate) struct SparseAttentionWave<'a> {
     graph_limit: usize,
     warmed_kernels: u16,
     cold: Option<ColdSparse>,
+    /// One-shot diagnostic operand capture; default disabled. Never read on
+    /// the serving path, so no extra synchronization or copy ever occurs.
+    input_trace: InputTraceTrigger,
 }
 struct RequestLaunch {
     window: V41SparseWindow,
@@ -140,7 +146,17 @@ impl<'a> SparseAttentionWave<'a> {
             graph_limit: 1,
             warmed_kernels: 0,
             cold: None,
+            input_trace: InputTraceTrigger::default(),
         })
+    }
+    /// Diagnostic-only: arm (`Some`) or clear (`None`) a one-shot capture of
+    /// the next staged execution's native operands. The wave consumes the
+    /// trigger on entry to that execution, so it can never leak past it.
+    pub fn set_input_trace(&mut self, directory: Option<&std::path::Path>) {
+        match directory {
+            Some(directory) => self.input_trace.arm(directory),
+            None => self.input_trace.disarm(),
+        }
     }
     /// Reserve wider decode batching before any execution and before KV sizing.
     /// K5 retains its original allocation; K7 pays only for the extra 16 rows.
@@ -421,6 +437,9 @@ impl<'a> SparseAttentionWave<'a> {
     unsafe fn execute_staged_inner(&mut self, layer: usize, sink: Ds41rtDeviceBuffer,
         requests: &[AttentionRequest<'_>], selection: Option<&IndexSelectionOutput<'_>>,
         defer_warmup: bool, mut tail: Option<&mut dyn AttentionGraphTail>) -> Result<Option<QueuedSparseAttention>> {
+        // Consume the one-shot diagnostic trigger before any work: an error or
+        // unwind below can never leak the capture into later executions.
+        let input_trace = self.input_trace.take();
         ensure!(self.cold.is_none(), "attention warmup is pending");
         ensure!(
             layer < 40 && !requests.is_empty() && requests.len() <= 16,
@@ -583,7 +602,7 @@ impl<'a> SparseAttentionWave<'a> {
                 selected.map_or(0, |buffer| buffer.ptr as usize)];
             Some(batch)
         } else { None };
-        for (i, m) in metadata.into_iter().enumerate() {
+        for (i, m) in metadata.iter().enumerate() {
             self.staging.bytes_mut()[i * 8..i * 8 + 8].copy_from_slice(&m.to_ne_bytes());
         }
         unsafe {
@@ -605,6 +624,37 @@ impl<'a> SparseAttentionWave<'a> {
                     self.replay_begins.buffer, self.replay_staging.buffer, rows * 8, self.stream.raw,
                 )?;
             }
+        }
+        if let Some(directory) = input_trace {
+            // Read-only diagnostic operand capture: every query, descriptor,
+            // metadata and bounds upload this invocation launches with is
+            // queued, and tail preparation, warmup, graph capture and launch
+            // have not started. The stream is synchronized here, outside any
+            // CUDA graph capture; the default (unarmed) path never reaches
+            // this block, so ordinary execution is unchanged.
+            self.synchronize()?;
+            let provenance: Vec<RequestProvenance> = requests.iter()
+                .map(|r| RequestProvenance { request_id: r.window.request, positions: r.positions.to_vec() })
+                .collect();
+            input_trace::capture_attention_inputs(
+                self.stream.library,
+                &directory,
+                layer,
+                rows,
+                &provenance,
+                &launches,
+                &metadata,
+                &WaveOperandBuffers {
+                    query: self.query.buffer,
+                    sink,
+                    metadata: self.metadata.buffer,
+                    selected,
+                    replay_begins: self.replay_begins.buffer,
+                    descriptors: self.descriptors.buffer,
+                },
+                batch.as_ref(),
+            )
+            .with_context(|| format!("capturing attention inputs for {}", directory.display()))?;
         }
         let queued = QueuedSparseAttention { values: slice(self.output.buffer, 0, rows * 65536), layer, rows };
         let tail_identity = tail.as_ref().map(|t| t.identity());
@@ -682,3 +732,7 @@ impl Drop for SparseAttentionWave<'_> {
 #[cfg(test)]
 #[path = "v41_sparse_attention/prefix_tests.rs"]
 mod prefix_tests;
+
+#[cfg(test)]
+#[path = "v41_sparse_attention/input_trace_tests.rs"]
+mod input_trace_tests;

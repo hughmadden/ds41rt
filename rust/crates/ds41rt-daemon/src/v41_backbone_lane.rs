@@ -761,6 +761,13 @@ impl<'w, 'a> BackboneLane<'w, 'a> {
     pub fn reserve_sparse_decode_rows(&mut self, rows: usize) -> Result<()> {
         self.sparse.reserve_decode_rows(rows)
     }
+    /// Diagnostic-only: arm (`Some`) or clear (`None`) this lane's one-shot
+    /// capture of the next sparse-attention execution's native operands.
+    /// Mirrors the activation-trace detail-layer selection; the default
+    /// `None` leaves serving entirely unchanged.
+    pub fn set_sparse_input_trace(&mut self, directory: Option<&std::path::Path>) {
+        self.sparse.set_input_trace(directory);
+    }
     /// Reserve adaptive route history during planning, before lane execution.
     pub fn reserve_route_capture(&mut self, layers: std::ops::Range<usize>, rows: usize) -> Result<()> {
         ensure!(layers.end <= 40 && rows <= 4096, "route history reservation exceeds model bounds");
