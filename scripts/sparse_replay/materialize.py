@@ -249,18 +249,13 @@ def materialize(row: CapturedRow, oracle) -> MaterializedRow:
         )
     slots_orig = _evidence_slots(row, oracle, resolved_orig)
 
-    # --- every live paged id must be captured (failure when a live paged ---
-    # --- row is missing or the capture is truncated) -----------------------
-    m = row.metadata10
-    if row.selected512 is not None:
-        for selected_id in set(row.selected512):
-            if 0 <= selected_id < m[6]:
-                if selected_id not in row.logical_to_physical:
-                    raise MissingLivePagedRowError(
-                        f"selected id {selected_id} is kernel-live "
-                        f"(0 <= id < source committed end {m[6]}) but has no "
-                        "captured logical_to_physical entry"
-                    )
+    # A selected id below the committed end is NOT by itself evidence of
+    # liveness: the oracle additionally masks a paged id whose page resolves
+    # outside the source capacity.  The live paged rows are exactly the
+    # unmasked paged-source keyslots, and ``_evidence_slots`` ->
+    # ``slot_bytes`` enforces that each one has captured content (raising
+    # MissingLivePagedRowError otherwise), so no separate "< m[6]" liveness
+    # assumption is made here.
 
     # --- compact page remap -------------------------------------------------
     # The kernel looks a logical id up through pages[logical // 256], so the
@@ -459,8 +454,35 @@ def mutate_private_source_column(
     if len(mutated_source_proposal_values) != len(row.source_proposal_values):
         raise MaterializeError("mutated proposal arena changed size")
 
-    clone = CapturedRow(**{**row.__dict__, "source_proposal_values":
-                           mutated_source_proposal_values})
+    # Rebuild the canonical evidence from the ACTUAL mutated bytes using the
+    # same reviewed resolver/evidence/digest pair as ``materialize``.  The
+    # clone must not inherit the source row's ``canonical_digest``; the source
+    # row's own evidence dict is left untouched (the clone gets a fresh dict)
+    # and the original digest is preserved separately in the returned
+    # evidence.
+    clone = CapturedRow(**{
+        **row.__dict__,
+        "source_proposal_values": mutated_source_proposal_values,
+        "evidence": dict(row.evidence),
+    })
+    resolved_mutated = _resolve(clone, oracle, clone.pages,
+                                clone.source_capacity_rows)
+    if not resolved_mutated["whole_row_valid"]:
+        raise MaterializeError(
+            f"mutated row {clone.key} is kernel-invalid "
+            f"({resolved_mutated['reason']})"
+        )
+    mutated_digest = canonical_digest(
+        resolved_mutated["width"], clone.compressed,
+        hashlib.sha256(clone.query_row).hexdigest(),
+        hashlib.sha256(clone.sink).hexdigest(),
+        _evidence_slots(clone, oracle, resolved_mutated),
+    )
+    clone = CapturedRow(**{
+        **clone.__dict__,
+        "evidence": {**row.evidence, "canonical_digest": mutated_digest},
+    })
+
     evidence = {
         "tag": "private_source",
         "proposal_row": proposal_index,
@@ -479,5 +501,7 @@ def mutate_private_source_column(
         "proposal_values_sha256": hashlib.sha256(
             mutated_source_proposal_values
         ).hexdigest(),
+        "canonical_digest": mutated_digest,
+        "original_canonical_digest": row.evidence.get("canonical_digest"),
     }
     return {"row": clone, "evidence": evidence}

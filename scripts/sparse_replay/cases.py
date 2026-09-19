@@ -2,10 +2,12 @@
 
 Every case names its rows by (wave, request_id) and, for counterfactuals,
 the single private-source nibble change plus which captured output each row
-is compared against.  The plan is fully deterministic: the same case list is
-used by the CPU validator and the GPU runner, and per-row expected output
-hashes are recorded so batch results cannot be faked by duplicating
-reference outputs.
+is compared against.  Exact duplicate-2 batches ([REF, REF] and
+[candidate_lane0, candidate_lane0]) are included explicitly rather than being
+derived, so a harness cannot silently deduplicate or fake them.  The plan is
+fully deterministic: the same case list is used by the CPU validator and the
+GPU runner, and per-row expected output hashes are recorded so batch results
+cannot be faked by duplicating reference outputs.
 """
 
 from __future__ import annotations
@@ -59,7 +61,7 @@ class Case:
 
 
 def standard_cases() -> list:
-    """The bounded explicit case list (single + batched, both orders)."""
+    """The bounded explicit case list (13 cases: singles, batches, duplicates)."""
     return [
         Case("single_reference", "single",
              [PlannedRow(REF)]),
@@ -75,6 +77,10 @@ def standard_cases() -> list:
              [PlannedRow(REF), PlannedRow(CANDIDATE_LANE0)]),
         Case("batch_swapped_candidate_reference", "batch",
              [PlannedRow(CANDIDATE_LANE0), PlannedRow(REF)]),
+        Case("batch_duplicate_reference_reference", "batch",
+             [PlannedRow(REF), PlannedRow(REF)]),
+        Case("batch_duplicate_candidate_lane0_candidate_lane0", "batch",
+             [PlannedRow(CANDIDATE_LANE0), PlannedRow(CANDIDATE_LANE0)]),
         Case("counterfactual_candidate_to_reference_single", "single",
              [PlannedRow(CANDIDATE_LANE0, CANDIDATE_TO_REFERENCE,
                          expected_key=REF)]),

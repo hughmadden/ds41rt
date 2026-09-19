@@ -258,6 +258,118 @@ def test_counterfactual_nibble_lands_on_captured_opposite_hashes(index, oracle):
         assert diffs == [147]
 
 
+@capture_required
+def test_counterfactual_materialize_regenerates_digest_and_matches_opposite(
+        index, oracle):
+    """Full mutation -> materialize chain for both actual counterfactuals.
+
+    The clone must carry canonical evidence regenerated from the actual
+    mutated bytes (not the source row's digest), materialization must
+    reproduce it, and each variant must land exactly on the opposite
+    capture's canonical digest.  The source rows' evidence is untouched.
+    """
+    reference = index[REF]
+    candidate = index[CANDIDATE_LANE0]
+    original_ref_digest = reference.evidence["canonical_digest"]
+    original_candidate_digest = candidate.evidence["canonical_digest"]
+    assert original_ref_digest == REFERENCE_CANONICAL_DIGEST
+    assert original_ref_digest != original_candidate_digest
+
+    # REF -> candidate (low nibble 1 -> 2).
+    to_candidate = mutate_private_source_column(
+        reference, oracle, 0x2, column=COUNTERFACTUAL_COLUMN
+    )
+    assert to_candidate["evidence"]["original_canonical_digest"] == \
+        original_ref_digest
+    assert to_candidate["row"].evidence["canonical_digest"] == \
+        to_candidate["evidence"]["canonical_digest"]
+    assert to_candidate["row"].evidence["canonical_digest"] == \
+        original_candidate_digest
+    assert to_candidate["row"].evidence["canonical_digest"] != \
+        to_candidate["evidence"]["original_canonical_digest"]
+    mat_candidate = materialize(to_candidate["row"], oracle)
+    assert mat_candidate.canonical_digest_compact == \
+        original_candidate_digest
+    assert mat_candidate.canonical_digest_compact == \
+        to_candidate["row"].evidence["canonical_digest"]
+
+    # candidate -> REF (low nibble 2 -> 1), the reciprocal.
+    to_reference = mutate_private_source_column(
+        candidate, oracle, 0x1, column=COUNTERFACTUAL_COLUMN
+    )
+    assert to_reference["evidence"]["original_canonical_digest"] == \
+        original_candidate_digest
+    assert to_reference["row"].evidence["canonical_digest"] == \
+        to_reference["evidence"]["canonical_digest"]
+    assert to_reference["row"].evidence["canonical_digest"] == \
+        original_ref_digest
+    mat_reference = materialize(to_reference["row"], oracle)
+    assert mat_reference.canonical_digest_compact == original_ref_digest
+    assert mat_reference.canonical_digest_compact == \
+        to_reference["row"].evidence["canonical_digest"]
+
+    # The captured source rows' evidence dicts are unchanged.
+    assert reference.evidence["canonical_digest"] == original_ref_digest
+    assert candidate.evidence["canonical_digest"] == original_candidate_digest
+    # Exactly one raw byte changed in each whole proposal arena.
+    for original, mutated in (
+        (reference.source_proposal_values,
+         to_candidate["row"].source_proposal_values),
+        (candidate.source_proposal_values,
+         to_reference["row"].source_proposal_values),
+    ):
+        diffs = [i for i, (a, b) in enumerate(zip(original, mutated))
+                 if a != b]
+        assert diffs == [COUNTERFACTUAL_COLUMN // 2] == [147]
+
+
+# ---------------------------------------------------------------------------
+# Explicit duplicate-2 batches.
+# ---------------------------------------------------------------------------
+
+@capture_required
+def test_standard_cases_include_explicit_duplicate2_batches(index):
+    cases = standard_cases()
+    names = [case.name for case in cases]
+    assert len(names) == 13
+    assert len(set(names)) == 13
+    by_name = {case.name: case for case in cases}
+    # The 11 pre-existing cases are still present.
+    for name in (
+        "single_reference", "single_candidate_lane0",
+        "single_candidate_lane1", "batch_as_captured_lane0",
+        "batch_as_captured_lane1", "batch_mixed_reference_candidate",
+        "batch_swapped_candidate_reference",
+        "counterfactual_candidate_to_reference_single",
+        "counterfactual_candidate_to_reference_batch",
+        "counterfactual_reference_to_candidate_single",
+        "counterfactual_reference_to_candidate_batch",
+    ):
+        assert name in by_name
+
+    duplicates = {
+        "batch_duplicate_reference_reference": REF,
+        "batch_duplicate_candidate_lane0_candidate_lane0": CANDIDATE_LANE0,
+    }
+    for name, key in duplicates.items():
+        case = by_name[name]
+        assert case.kind == "batch"
+        assert case.row_count == 2
+        assert [planned.key for planned in case.rows] == [key, key]
+        assert all(planned.counterfactual is None for planned in case.rows)
+        plan = plan_case(case, index, repeats=3)
+        assert [row["request_id"] for row in plan["rows"]] == [key[1], key[1]]
+        hashes = [row["expected_output_sha256"] for row in plan["rows"]]
+        assert hashes[0] == hashes[1]
+        metas = [tuple(row["actual_metadata10"]) for row in plan["rows"]]
+        assert metas[0] == metas[1]
+        digests = [row["canonical_digest"] for row in plan["rows"]]
+        assert digests[0] == digests[1]
+    # REF and candidate are distinct rows, so the two duplicate batches are
+    # not interchangeable.
+    assert REF != CANDIDATE_LANE0
+
+
 # ---------------------------------------------------------------------------
 # Failure modes: truncated capture / missing live paged row.
 # ---------------------------------------------------------------------------
@@ -318,9 +430,25 @@ def test_cli_default_mode_validates_and_plans(tmp_path):
     assert result.returncode == 0, result.stderr
     plan = json.loads(result.stdout)
     assert plan["mode"] == "validate/plan (CPU only)"
-    assert len(plan["cases"]) == 11
+    assert len(plan["cases"]) == 13
     assert all(v["canonical_digest_matches_capture"]
                for v in plan["materialized"].values())
+    # Every mutated variant is materialized on CPU and its compact digest
+    # reproduces the digest regenerated from the actual mutated bytes.
+    cf_mat = plan["counterfactual_materialized"]
+    assert len(cf_mat) == 2
+    assert all(v["canonical_digest_matches_mutation"]
+               for v in cf_mat.values())
+    ref_digest = plan["request_rows"][
+        "lane0-batch20-Full-1rows:2026091950"]["canonical_digest"]
+    candidate_digest = plan["request_rows"][
+        "lane0-batch81-Full-2rows:2026091960"]["canonical_digest"]
+    assert cf_mat[
+        "lane0-batch20-Full-1rows:2026091950:reference_to_candidate"
+    ]["canonical_digest_compact"] == candidate_digest
+    assert cf_mat[
+        "lane0-batch81-Full-2rows:2026091960:candidate_to_reference"
+    ]["canonical_digest_compact"] == ref_digest
     cf = plan["counterfactual_variants"]
     assert cf["lane0-batch81-Full-2rows:2026091960:candidate_to_reference"]["after_sha256"] == \
         REFERENCE_SLOT62_VALUE_SHA

@@ -84,6 +84,7 @@ def validate_and_plan(args) -> dict:
     cases = select_cases(standard_cases(), args.cases)
     materialized = {}
     variants = {}
+    counterfactual_materialized = {}
     for case in cases:
         for planned in case.rows:
             for key, counterfactual in (
@@ -103,6 +104,13 @@ def validate_and_plan(args) -> dict:
                         variants[variant_key] = mutate_private_source_column(
                             index[key], oracle, nibble,
                             column=COUNTERFACTUAL_COLUMN,
+                        )
+                        # Materialize the mutated variant too: the compact
+                        # fixture must reproduce the digest regenerated from
+                        # the actual mutated bytes, and this failure must
+                        # surface here on CPU rather than after a GPU launch.
+                        counterfactual_materialized[variant_key] = materialize(
+                            variants[variant_key]["row"], oracle
                         )
 
     plan = {
@@ -140,6 +148,23 @@ def validate_and_plan(args) -> dict:
         "counterfactual_variants": {
             f"{key[0]}:{key[1]}:{cf}": record["evidence"]
             for (key, cf), record in sorted(variants.items())
+        },
+        "counterfactual_materialized": {
+            f"{key[0]}:{key[1]}:{cf}": {
+                "source_capacity": mat.source_capacity,
+                "pool_bytes": mat.pool_bytes,
+                "page_map": {str(k): v for k, v in sorted(mat.page_map.items())},
+                "untouched_pages_point_outside_capacity": True,
+                "canonical_digest_compact": mat.canonical_digest_compact,
+                "canonical_digest_matches_mutation": (
+                    mat.canonical_digest_compact
+                    == variants[(key, cf)]["evidence"]["canonical_digest"]
+                ),
+                "original_canonical_digest": (
+                    variants[(key, cf)]["evidence"]["original_canonical_digest"]
+                ),
+            }
+            for (key, cf), mat in sorted(counterfactual_materialized.items())
         },
         "cases": [plan_case(case, index, args.repeats) for case in cases],
         "execute_command": (

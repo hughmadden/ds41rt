@@ -38,6 +38,7 @@ from sparse_replay.materialize import (  # noqa: E402
     MaterializeError,
     MissingLivePagedRowError,
     SENTINEL_PAGE,
+    _resolve,
     materialize,
     mutate_private_source_column,
     set_fp4_low_nibble,
@@ -233,6 +234,47 @@ def test_missing_live_paged_row_is_a_hard_failure():
         materialize(row, ORACLE)
 
 
+def test_selected_id_masked_outside_capacity_needs_no_captured_row():
+    """A selected id below the committed end can still be kernel-masked.
+
+    The oracle masks it because its page maps to a physical row outside the
+    source capacity.  It must stay masked after compaction and must not be
+    treated as a live paged row that requires captured content (the previous
+    ``selected_id < metadata[6]`` assumption raised here).
+    """
+    pages = [3, 400]
+    logical_to_physical = {0: 768}
+    referenced = [768]
+    selected = [0, 256]
+    # m[5] == m[6] == 300: id 256 is below the committed/causal end, but
+    # pages[1] = 400 -> physical 102400 >= source_capacity_rows = 100000.
+    metadata = [4, 0, 1, 4, 0, 300, 300, 0, 0, 1]
+    row = make_synthetic_row(
+        pages, logical_to_physical, referenced, selected, metadata,
+        window_end=4, source_end=300, source_capacity_rows=100000,
+    )
+    assert 256 not in row.logical_to_physical
+
+    resolved = _resolve(row, ORACLE, row.pages, row.source_capacity_rows)
+    masked = [entry for entry in resolved["keyslots"]
+              if entry["logical"] == 256]
+    assert len(masked) == 1
+    assert masked[0]["masked"] and masked[0]["tag"] is None
+
+    mat = materialize(row, ORACLE)
+    slot = [entry for entry in mat.slot_evidence_compact
+            if entry["logical"] == 256]
+    assert len(slot) == 1
+    assert slot[0]["masked"] and slot[0]["tag"] is None
+    # The genuinely live paged id still keeps its exact captured content and
+    # the untouched logical page points outside the compact capacity.
+    live = [entry for entry in mat.slot_evidence_compact
+            if not entry["masked"] and entry["tag"] == "paged_source"]
+    assert [entry["logical"] for entry in live] == [0]
+    assert mat.pages_compact[1] == SENTINEL_PAGE
+    assert mat.source_capacity == 1
+
+
 def test_materialize_rejects_inconsistent_page_table():
     row = synthetic_scenario_a()
     row = CapturedRow(**{
@@ -308,6 +350,16 @@ def test_counterfactual_changes_exactly_one_low_nibble():
     assert mat.slot_evidence_compact[8]["tag"] == "private_source"
     assert mat.slot_evidence_compact[8]["value_sha256"] == \
         evidence["after_sha256"]
+    # The clone's canonical evidence was regenerated from the actual mutated
+    # bytes (the compact view reproduces it exactly); the source row's own
+    # evidence dict was not mutated and the original digest is preserved
+    # separately.
+    assert result["row"].evidence["canonical_digest"] == \
+        mat.canonical_digest_compact
+    assert result["row"].evidence["canonical_digest"] == \
+        evidence["canonical_digest"]
+    assert evidence["original_canonical_digest"] is None
+    assert row.evidence["canonical_digest"] is None
 
 
 def test_counterfactual_roundtrip_is_involutive():
