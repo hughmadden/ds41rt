@@ -1,6 +1,6 @@
 //! Native CSA2 projection and immutable-state ratio-two pooling.
 use crate::{Ds41rtDeviceBuffer, NativeLibrary};
-use anyhow::{ensure, Result};
+use anyhow::{ensure, Context, Result};
 use std::ffi::c_void;
 type Create = unsafe extern "C" fn(*mut c_void, u64, *mut *mut c_void) -> i32;
 type Destroy = unsafe extern "C" fn(*mut c_void) -> i32;
@@ -15,6 +15,7 @@ type Project = unsafe extern "C" fn(
 ) -> i32;
 type IndexProject =
     unsafe extern "C" fn(*mut c_void, *const u16, *const u16, *mut u16, i32, *mut c_void) -> i32;
+type PadInput = unsafe extern "C" fn(*mut u16, i32, i32, *mut c_void) -> i32;
 type QueryPrepare = unsafe extern "C" fn(
     *const u16,
     *const f32,
@@ -59,6 +60,7 @@ pub struct V41Compressor<'a> {
     index_pack: IndexPack,
     index_store: IndexStore,
     pool: Pool,
+    pad_input: Option<PadInput>,
 }
 fn buffer(b: Ds41rtDeviceBuffer, bytes: usize) -> Result<()> {
     ensure!(
@@ -66,6 +68,24 @@ fn buffer(b: Ds41rtDeviceBuffer, bytes: usize) -> Result<()> {
         "compressor buffer is null or undersized"
     );
     Ok(())
+}
+/// Pure extent/shape validation for the optional pad-input export. Kept separate
+/// from the native call so CPU tests can check rows/padded-rows/buffer rules with
+/// synthetic device buffers.
+fn validate_pad_input_buffers(
+    input: Ds41rtDeviceBuffer,
+    rows: usize,
+    padded_rows: usize,
+) -> Result<()> {
+    ensure!(
+        padded_rows == 2 || padded_rows == 16,
+        "invalid compressor pad rows"
+    );
+    ensure!(
+        (1..=padded_rows).contains(&rows),
+        "invalid compressor pad live rows"
+    );
+    buffer(input, padded_rows * 10240)
 }
 impl NativeLibrary {
     /// # Safety
@@ -88,6 +108,15 @@ impl NativeLibrary {
         let query_prepare: QueryPrepare =
             unsafe { *self.lib.get(b"ds41rt_v41_index_query_prepare")? };
         let pool: Pool = unsafe { *self.lib.get(b"ds41rt_v41_compressor_pool")? };
+        // Optional EXPERIMENTAL export: older native libraries keep working with
+        // the pad-rows policy off; selecting the policy without this export must
+        // fail clearly before any enqueue (checked via `pad_input_supported`).
+        let pad_input: Option<PadInput> = unsafe {
+            self.lib
+                .get(b"ds41rt_v41_compressor_pad_input")
+                .ok()
+                .map(|symbol| *symbol)
+        };
         let mut handle = std::ptr::null_mut();
         let status = unsafe { create(workspace.ptr, workspace.bytes as u64, &mut handle) };
         ensure!(status == 0, "native compressor create status {status}");
@@ -102,6 +131,7 @@ impl NativeLibrary {
             index_pack,
             index_store,
             pool,
+            pad_input,
         })
     }
 }
@@ -315,6 +345,43 @@ impl V41Compressor<'_> {
         ensure!(status == 0, "native compressor projection status {status}");
         Ok(())
     }
+    /// Whether the loaded native library exports `ds41rt_v41_compressor_pad_input`.
+    /// Waves that select the EXPERIMENTAL pad-rows policy must check this before
+    /// enqueueing so a stale native library fails clearly instead of silently
+    /// falling back to unpadded geometry.
+    pub fn pad_input_supported(&self) -> bool {
+        self.pad_input.is_some()
+    }
+    /// # Safety
+    /// Caller-owned writable BF16 [padded_rows,5120] scratch is live on the stream
+    /// device through the recorded memset (including CUDA graph capture). Only the
+    /// tail [rows,padded_rows) is zeroed; the live prefix is never touched. This
+    /// performs no allocation and leaves the workspace and weights untouched.
+    /// Requires 1<=rows<=padded_rows with padded_rows in {2,16}; rows==padded_rows
+    /// is a validated no-op.
+    pub unsafe fn pad_input(
+        &self,
+        input: Ds41rtDeviceBuffer,
+        rows: usize,
+        padded_rows: usize,
+        stream: *mut c_void,
+    ) -> Result<()> {
+        let pad_input = self.pad_input.context(
+            "native library does not export ds41rt_v41_compressor_pad_input; \
+             the DS41RT_COMPRESSOR_PAD_ROWS policy requires a native build that provides it",
+        )?;
+        validate_pad_input_buffers(input, rows, padded_rows)?;
+        let status = unsafe {
+            pad_input(
+                input.ptr.cast::<u16>(),
+                rows as i32,
+                padded_rows as i32,
+                stream,
+            )
+        };
+        ensure!(status == 0, "native compressor pad input status {status}");
+        Ok(())
+    }
     /// # Safety
     /// FP32 projections [rows,512], committed pending values [slots,512], U64
     /// predecessors [rows], BF16 weight [512] and output [rows,512] are live on
@@ -372,5 +439,237 @@ impl Drop for V41Compressor<'_> {
         if status != 0 {
             eprintln!("native compressor destruction status {status}");
         }
+    }
+}
+
+#[cfg(test)]
+mod pad_input_tests {
+    use super::*;
+    use std::path::PathBuf;
+    use std::process::Command;
+    use std::sync::atomic::{AtomicU64, Ordering};
+
+    // CPU mock convention: a tiny stub shared library built with the host C
+    // compiler. It implements the exact compressor export surface with trivial
+    // bodies and records every pad-input call so tests can verify the optional
+    // symbol resolution, argument pass-through, and extent/shape validation
+    // without a GPU. No fake GPU numerics are produced: the stub never computes.
+    const STUB_C: &str = r#"
+#include <stdint.h>
+
+static int32_t pad_calls = 0;
+static void* pad_last_input = 0;
+static int32_t pad_last_rows = -1;
+static int32_t pad_last_padded_rows = -1;
+static void* pad_last_stream = 0;
+
+int32_t ds41rt_rdma_rc_endpoint_try_poll(void* endpoint) {
+    (void)endpoint;
+    return 0;
+}
+int32_t ds41rt_v41_compressor_create(void* workspace, uint64_t bytes, void** output) {
+    (void)workspace; (void)bytes;
+    *output = (void*)(uintptr_t)1;
+    return 0;
+}
+int32_t ds41rt_v41_compressor_destroy(void* handle) {
+    (void)handle;
+    return 0;
+}
+int32_t ds41rt_v41_compressor_project(void* handle, const uint16_t* input,
+        const uint16_t* weight, void* output, int32_t rows, int32_t ratio, void* stream) {
+    (void)handle; (void)input; (void)weight; (void)output;
+    (void)rows; (void)ratio; (void)stream;
+    return 0;
+}
+int32_t ds41rt_v41_index_key_project(void* handle, const uint16_t* input,
+        const uint16_t* weight, uint16_t* output, int32_t rows, void* stream) {
+    (void)handle; (void)input; (void)weight; (void)output; (void)rows; (void)stream;
+    return 0;
+}
+int32_t ds41rt_v41_index_weights_project(void* handle, const uint16_t* input,
+        const uint16_t* weight, uint16_t* output, int32_t rows, void* stream) {
+    (void)handle; (void)input; (void)weight; (void)output; (void)rows; (void)stream;
+    return 0;
+}
+int32_t ds41rt_v41_index_pack(const uint16_t* input, uint8_t* packed,
+        uint8_t* scales, int32_t rows, void* stream) {
+    (void)input; (void)packed; (void)scales; (void)rows; (void)stream;
+    return 0;
+}
+int32_t ds41rt_v41_index_store(const uint8_t* packed, const uint8_t* scales,
+        const uint64_t* destinations, uint8_t* cache, uint8_t* cache_scales,
+        int32_t rows, uint64_t capacity, void* stream) {
+    (void)packed; (void)scales; (void)destinations; (void)cache;
+    (void)cache_scales; (void)rows; (void)capacity; (void)stream;
+    return 0;
+}
+int32_t ds41rt_v41_compressor_pool(const float* kv, const float* scores,
+        const float* pending_kv, const float* pending_scores, const uint64_t* predecessors,
+        const uint16_t* norm_weight, uint16_t* output, int32_t rows, int32_t slots,
+        void* stream) {
+    (void)kv; (void)scores; (void)pending_kv; (void)pending_scores;
+    (void)predecessors; (void)norm_weight; (void)output;
+    (void)rows; (void)slots; (void)stream;
+    return 0;
+}
+int32_t ds41rt_v41_index_query_prepare(const uint16_t* input, const float* frequencies,
+        const uint16_t* weights, uint8_t* packed, uint8_t* scales,
+        uint16_t* scaled_weights, int32_t rows, void* stream) {
+    (void)input; (void)frequencies; (void)weights; (void)packed;
+    (void)scales; (void)scaled_weights; (void)rows; (void)stream;
+    return 0;
+}
+#ifndef DS41RT_STUB_WITHOUT_PAD_EXPORT
+int32_t ds41rt_v41_compressor_pad_input(uint16_t* input, int32_t rows,
+        int32_t padded_rows, void* stream) {
+    pad_calls += 1;
+    pad_last_input = input;
+    pad_last_rows = rows;
+    pad_last_padded_rows = padded_rows;
+    pad_last_stream = stream;
+    return 0;
+}
+#endif
+int32_t stub_pad_input_calls(void) { return pad_calls; }
+void* stub_pad_input_last_input(void) { return pad_last_input; }
+int32_t stub_pad_input_last_rows(void) { return pad_last_rows; }
+int32_t stub_pad_input_last_padded_rows(void) { return pad_last_padded_rows; }
+void* stub_pad_input_last_stream(void) { return pad_last_stream; }
+"#;
+
+    static STUB_COUNTER: AtomicU64 = AtomicU64::new(0);
+
+    fn build_stub(without_pad_export: bool) -> Option<PathBuf> {
+        let cc = Command::new("cc").arg("--version").output().ok()?;
+        if !cc.status.success() {
+            eprintln!("skipping pad-input stub test: no working host C compiler");
+            return None;
+        }
+        let unique = STUB_COUNTER.fetch_add(1, Ordering::Relaxed);
+        let directory = std::env::temp_dir().join(format!(
+            "ds41rt-pad-input-stub-{}-{unique}",
+            std::process::id()
+        ));
+        std::fs::create_dir_all(&directory).ok()?;
+        let source = directory.join("stub.c");
+        std::fs::write(&source, STUB_C).ok()?;
+        let library = directory.join(if without_pad_export {
+            "libds41rt_stub_nopad.so"
+        } else {
+            "libds41rt_stub.so"
+        });
+        let mut command = Command::new("cc");
+        command
+            .arg("-shared")
+            .arg("-fPIC")
+            .arg("-o")
+            .arg(&library)
+            .arg(&source);
+        if without_pad_export {
+            command.arg("-DDS41RT_STUB_WITHOUT_PAD_EXPORT");
+        }
+        let output = command.output().ok()?;
+        if !output.status.success() {
+            eprintln!(
+                "skipping pad-input stub test: stub build failed: {}",
+                String::from_utf8_lossy(&output.stderr)
+            );
+            return None;
+        }
+        Some(library)
+    }
+
+    fn workspace_buffer() -> Ds41rtDeviceBuffer {
+        Ds41rtDeviceBuffer {
+            ptr: 0x1000_0000 as *mut c_void,
+            bytes: V41Compressor::WORKSPACE_BYTES,
+            device_id: 0,
+            flags: 0,
+        }
+    }
+
+    fn input_buffer(rows: usize) -> Ds41rtDeviceBuffer {
+        Ds41rtDeviceBuffer {
+            ptr: 0x2000_0000 as *mut c_void,
+            bytes: rows * 10240,
+            device_id: 0,
+            flags: 0,
+        }
+    }
+
+    #[test]
+    fn old_library_without_pad_export_still_constructs_and_pad_use_fails_clearly() {
+        let Some(path) = build_stub(true) else { return };
+        let library = unsafe { NativeLibrary::load(path) }.expect("load stub library");
+        let kernel = unsafe { library.v41_compressor(workspace_buffer()) }
+            .expect("old library must keep working when the policy is off");
+        assert!(!kernel.pad_input_supported());
+        let error = unsafe {
+            kernel.pad_input(input_buffer(2), 1, 2, std::ptr::null_mut())
+        }
+        .expect_err("pad use on a library without the export must fail clearly");
+        assert!(
+            error
+                .to_string()
+                .contains("ds41rt_v41_compressor_pad_input"),
+            "unexpected error: {error:#}"
+        );
+    }
+
+    #[test]
+    fn stub_passes_exact_pad_arguments_and_validates_shape_and_extent() {
+        let Some(path) = build_stub(false) else { return };
+        let library = unsafe { NativeLibrary::load(path) }.expect("load stub library");
+        let kernel = unsafe { library.v41_compressor(workspace_buffer()) }
+            .expect("construct compressor against stub");
+        assert!(kernel.pad_input_supported());
+        let stream = 0x55 as *mut c_void;
+        unsafe {
+            kernel
+                .pad_input(input_buffer(16), 3, 16, stream)
+                .expect("valid pad call");
+        }
+        type Getter<T> = unsafe extern "C" fn() -> T;
+        let calls: Getter<i32> = unsafe { *library.lib.get(b"stub_pad_input_calls").unwrap() };
+        let last_input: Getter<*mut c_void> =
+            unsafe { *library.lib.get(b"stub_pad_input_last_input").unwrap() };
+        let last_rows: Getter<i32> = unsafe { *library.lib.get(b"stub_pad_input_last_rows").unwrap() };
+        let last_padded: Getter<i32> =
+            unsafe { *library.lib.get(b"stub_pad_input_last_padded_rows").unwrap() };
+        let last_stream: Getter<*mut c_void> =
+            unsafe { *library.lib.get(b"stub_pad_input_last_stream").unwrap() };
+        assert_eq!(unsafe { calls() }, 1);
+        assert_eq!(unsafe { last_input() }, input_buffer(16).ptr);
+        assert_eq!(unsafe { last_rows() }, 3);
+        assert_eq!(unsafe { last_padded() }, 16);
+        assert_eq!(unsafe { last_stream() }, stream);
+        // rows == padded_rows is a validated no-op but still reaches the export.
+        unsafe {
+            kernel
+                .pad_input(input_buffer(2), 2, 2, stream)
+                .expect("equal rows is a valid no-op");
+        }
+        assert_eq!(unsafe { calls() }, 2);
+        assert_eq!(unsafe { last_rows() }, 2);
+        // Rejected shapes/extents never reach the native call.
+        for (rows, padded) in [(0, 2), (3, 2), (1, 3), (1, 15), (17, 16)] {
+            unsafe {
+                kernel
+                    .pad_input(input_buffer(16), rows, padded, stream)
+                    .expect_err("invalid pad shape must be rejected");
+            }
+        }
+        let mut null_buffer = input_buffer(2);
+        null_buffer.ptr = std::ptr::null_mut();
+        unsafe {
+            kernel
+                .pad_input(null_buffer, 1, 2, stream)
+                .expect_err("null input must be rejected");
+            kernel
+                .pad_input(input_buffer(1), 1, 2, stream)
+                .expect_err("undersized input extent must be rejected");
+        }
+        assert_eq!(unsafe { calls() }, 2, "rejected calls must not reach the stub");
     }
 }

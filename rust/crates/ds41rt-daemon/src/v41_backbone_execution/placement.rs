@@ -255,6 +255,7 @@ impl<'w, 'a> PlacedProducerWaves<'w, 'a> {
         placement: CachePlacement,
         capacity: u32,
     ) -> Result<[usize; 2]> {
+        let pad_rows = crate::v41_compressor::PadRowsPolicy::from_env()?;
         let mut bytes = [0usize; 2];
         let window = WindowWave::device_bytes(library, capacity)?;
         for layer in 0..40 {
@@ -266,7 +267,11 @@ impl<'w, 'a> PlacedProducerWaves<'w, 'a> {
         for layer in SOURCES {
             let gpu = placement.attention(layer)?;
             bytes[gpu] = bytes[gpu]
-                .checked_add(CompressorWave::device_bytes(layer, capacity as usize)?)
+                .checked_add(CompressorWave::device_bytes(
+                    layer,
+                    capacity as usize,
+                    pad_rows,
+                )?)
                 .context("placed compressor workspace overflow")?;
         }
         Ok(bytes)
@@ -279,6 +284,7 @@ impl<'w, 'a> PlacedProducerWaves<'w, 'a> {
         let placement = weights
             .placement
             .context("placed producer workspaces need a placement map")?;
+        let pad_rows = crate::v41_compressor::PadRowsPolicy::from_env()?;
         let bytes = Self::device_bytes(weights.library, placement, capacity)?;
         ensure!(
             bytes
@@ -307,7 +313,7 @@ impl<'w, 'a> PlacedProducerWaves<'w, 'a> {
                 weights.device.own(|| {
                     weights.wave(
                         capacity as usize,
-                        CompressorWave::device_bytes(layer, capacity as usize)?,
+                        CompressorWave::device_bytes(layer, capacity as usize, pad_rows)?,
                     )
                 })
             })
@@ -525,6 +531,7 @@ mod tests {
         use crate::v41_attention_query::{AttentionQueryWave, AttentionQueryWeights};
         use crate::v41_backbone_cache::CacheWork;
         use ds41rt_transport::ExpertV2SourceKind;
+        let pad_rows = crate::v41_compressor::PadRowsPolicy::from_env()?;
         let lib = unsafe { NativeLibrary::load(std::env::var("DS41RT_NATIVE_LIB")?)? };
         let catalog = ds41rt_loader::read_official_v41_catalog(
             ds41rt_loader::OFFICIAL_V41_MODEL_ID,
@@ -586,7 +593,8 @@ mod tests {
             let mut reference_window = device
                 .own(|| weights.windows[layer].wave(16, WindowWave::device_bytes(&lib, 16)?))?;
             let mut reference_source = device.own(|| {
-                weights.sources[source_id].wave(16, CompressorWave::device_bytes(layer, 16)?)
+                weights.sources[source_id]
+                    .wave(16, CompressorWave::device_bytes(layer, 16, pad_rows)?)
             })?;
             let runtime = tokio::runtime::Builder::new_current_thread().build()?;
             for seed in [0, 7] {
@@ -668,6 +676,7 @@ mod tests {
     #[test]
     #[ignore = "requires DS41RT_NATIVE_LIB, DS41RT_SNAPSHOT, and two CUDA GPUs"]
     fn real_placed_producers_and_window_graphs_match_across_devices() -> Result<()> {
+        let pad_rows = crate::v41_compressor::PadRowsPolicy::from_env()?;
         let lib = unsafe { NativeLibrary::load(std::env::var("DS41RT_NATIVE_LIB")?)? };
         let catalog = ds41rt_loader::read_official_v41_catalog(
             ds41rt_loader::OFFICIAL_V41_MODEL_ID,
@@ -828,7 +837,7 @@ mod tests {
             source_states[1].begin_request(0, 1)?,
         ];
         let mut reference_compressor_wave = devices[0]
-            .own(|| reference_compressor.wave(16, CompressorWave::device_bytes(20, 16)?))?;
+            .own(|| reference_compressor.wave(16, CompressorWave::device_bytes(20, 16, pad_rows)?))?;
         let mut previous = None;
         for changed in [false, true] {
             let host: Vec<u8> = (0..16 * 5120)

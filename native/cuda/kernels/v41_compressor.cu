@@ -149,6 +149,14 @@ extern "C" int32_t ds41rt_v41_compressor_project(void* handle,const uint16_t* in
     const uint16_t* weight,void* output,int32_t rows,int32_t ratio,void* stream) {
   return project(handle,input,weight,output,rows,ratio,stream,512,5120);
 }
+extern "C" int32_t ds41rt_v41_compressor_pad_input(uint16_t* input,int32_t rows,
+    int32_t padded_rows,void* stream) {
+  if(rows<1 || rows>padded_rows || (padded_rows!=2 && padded_rows!=16))return cudaErrorInvalidValue;
+  if(!valid(input,uint64_t(padded_rows)*10240,2))return cudaErrorInvalidValue;
+  if(rows==padded_rows)return cudaSuccess;
+  return cudaMemsetAsync(input+uint64_t(rows)*5120,0,uint64_t(padded_rows-rows)*10240,
+      reinterpret_cast<cudaStream_t>(stream));
+}
 extern "C" int32_t ds41rt_v41_index_key_project(void* handle,const uint16_t* input,
     const uint16_t* weight,uint16_t* output,int32_t rows,void* stream) {
   return project(handle,input,weight,output,rows,1,stream,128,512);

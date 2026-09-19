@@ -12,6 +12,8 @@ pub(crate) mod source_cache;
 mod commit;
 use commit::PendingCommit;
 mod input_trace;
+mod pad_rows;
+pub(crate) use pad_rows::PadRowsPolicy;
 mod prefix;
 pub(crate) use prefix::{CompressorPrefix, COMPRESSOR_PREFIX_BYTES};
 use source_cache::SourceCache;
@@ -284,8 +286,11 @@ impl<'a> CompressorWeights<'a> {
         })
     }
     pub fn wave(&self, rows: usize, budget: usize) -> Result<CompressorWave<'_, 'a>> {
+        // Capture the EXPERIMENTAL pad-rows policy once per wave: invalid config
+        // is rejected here, before any wave allocation happens.
+        let pad_rows = PadRowsPolicy::from_env()?;
         ensure!(
-            CompressorWave::device_bytes(self.layer, rows)? <= budget,
+            CompressorWave::device_bytes(self.layer, rows, pad_rows)? <= budget,
             "compressor wave exceeds budget"
         );
         let workspace = DeviceAllocation::new(self.library, V41Compressor::WORKSPACE_BYTES)?;
@@ -294,6 +299,15 @@ impl<'a> CompressorWeights<'a> {
             "compressor weights device differs"
         );
         let kernel = unsafe { self.library.v41_compressor(workspace.buffer)? };
+        ensure!(
+            !pad_rows.enabled() || kernel.pad_input_supported(),
+            "DS41RT_COMPRESSOR_PAD_ROWS is selected but the native library does not \
+             export ds41rt_v41_compressor_pad_input; rebuild the native library or \
+             unset the policy"
+        );
+        // Input, projected and scores are the only buffers that follow the pad
+        // geometry; every other buffer keeps the exact logical capacity.
+        let allocation_rows = pad_rows.allocation_rows(self.ratio, rows);
         Ok(CompressorWave {
             stream: LoadStream {
                 library: self.library,
@@ -304,13 +318,13 @@ impl<'a> CompressorWeights<'a> {
             _workspace: workspace,
             norm: self.library.v41_attention_ops()?,
             weights: self,
-            input: DeviceAllocation::new(self.library, rows * 10240)?,
+            input: DeviceAllocation::new(self.library, allocation_rows * 10240)?,
             projected: DeviceAllocation::new(
                 self.library,
-                rows * 512 * if self.ratio == 2 { 4 } else { 2 },
+                allocation_rows * 512 * if self.ratio == 2 { 4 } else { 2 },
             )?,
             scores: if self.ratio == 2 {
-                Some(DeviceAllocation::new(self.library, rows * 2048)?)
+                Some(DeviceAllocation::new(self.library, allocation_rows * 2048)?)
             } else {
                 None
             },
@@ -334,6 +348,7 @@ impl<'a> CompressorWeights<'a> {
             cache_destinations: DeviceAllocation::new(self.library, rows * 8)?,
             output: DeviceAllocation::new(self.library, rows * 1024)?,
             capacity: rows,
+            pad_rows,
             graph: None,
             ready: None,
             pending_query: None,
@@ -449,6 +464,8 @@ pub(crate) struct CompressorWave<'w, 'a> {
     cache_destinations: DeviceAllocation<'a>,
     output: DeviceAllocation<'a>,
     capacity: usize,
+    /// EXPERIMENTAL small-row projection geometry captured once at wave creation.
+    pad_rows: PadRowsPolicy,
     graph: Option<(*mut c_void, usize, u64)>,
     ready: Option<Prepared>,
     pending_query: Option<(Prepared, bool)>,
@@ -456,18 +473,20 @@ pub(crate) struct CompressorWave<'w, 'a> {
     commit_staging: HostAllocation<'a>,
 }
 impl CompressorWave<'_, '_> {
-    pub fn device_bytes(layer: usize, rows: usize) -> Result<usize> {
+    pub fn device_bytes(layer: usize, rows: usize, pad_rows: PadRowsPolicy) -> Result<usize> {
         ensure!(
             (1..=4096).contains(&rows),
             "invalid compressor row capacity"
         );
+        let ratio = ratio(layer)?;
         Ok(V41Compressor::WORKSPACE_BYTES
             + rows
-                * if ratio(layer)? == 2 {
+                * if ratio == 2 {
                     10240 + 2048 + 2048 + 8 + 1024 + 264 + 512 + 68 + 8 + V41Kv::COMPRESSED_ROW_BYTES
                 } else {
                     10240 + 1024 + 1024 + 264 + 512 + 68 + 8 + V41Kv::COMPRESSED_ROW_BYTES
-                })
+                }
+            + pad_rows.extra_bytes(ratio, rows))
     }
     /// Packed BF16 [sum(chunk.tokens),5120], in chunk order. Finish all producer
     /// writes before execution, and keep this borrowed storage live until drop.
@@ -628,11 +647,28 @@ impl CompressorWave<'_, '_> {
                 self.weights.layer as u32,
                 self.stream.raw,
             )?;
+            // EXPERIMENTAL small-row geometry: for a ratio-two batch at or below
+            // the configured pad, zero only the stale input tail on this same
+            // serialized stream, then run WKV/Wgate at the padded row count. The
+            // live prefix is never touched; pool/index/pack below keep live rows.
+            // With the policy off (or ratio one) this is exactly the old shape:
+            // no memset and projections at the live row count. The memset is a
+            // recorded stream op, so capture and replay need no hot allocation,
+            // sync or environment read.
+            let projection = self.pad_rows.projection(self.weights.ratio, rows);
+            if projection.zero.is_some() {
+                self.kernel.pad_input(
+                    self.input.buffer,
+                    rows,
+                    projection.rows,
+                    self.stream.raw,
+                )?;
+            }
             self.kernel.project(
                 self.input.buffer,
                 self.weights.tensors.get(&self.weights.names[0])?,
                 self.projected.buffer,
-                rows,
+                projection.rows,
                 self.weights.ratio,
                 self.stream.raw,
             )?;
@@ -641,7 +677,7 @@ impl CompressorWave<'_, '_> {
                     self.input.buffer,
                     self.weights.tensors.get(&self.weights.names[2])?,
                     self.scores.as_ref().unwrap().buffer,
-                    rows,
+                    projection.rows,
                     2,
                     self.stream.raw,
                 )?;

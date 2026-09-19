@@ -345,12 +345,13 @@ impl Drop for PendingProduction<'_, '_, '_> {
 }
 impl<'w, 'a> BackboneExecution<'w, 'a> {
     pub fn workspace_bytes(library: &NativeLibrary, capacity: u32) -> Result<usize> {
+        let pad_rows = crate::v41_compressor::PadRowsPolicy::from_env()?;
         let mut total = WindowWave::device_bytes(library, capacity)?
             .checked_mul(40)
             .context("window workspace budget overflow")?;
         for layer in SOURCES {
             total = total
-                .checked_add(CompressorWave::device_bytes(layer, capacity as usize)?)
+                .checked_add(CompressorWave::device_bytes(layer, capacity as usize, pad_rows)?)
                 .context("source workspace budget overflow")?;
         }
         Ok(total)
@@ -369,6 +370,7 @@ impl<'w, 'a> BackboneExecution<'w, 'a> {
             weights.windows.len() == 40 && weights.sources.len() == 4,
             "cache producer weight owners incomplete"
         );
+        let pad_rows = crate::v41_compressor::PadRowsPolicy::from_env()?;
         let windows = weights
             .windows
             .iter()
@@ -386,7 +388,7 @@ impl<'w, 'a> BackboneExecution<'w, 'a> {
             .map(|(w, layer)| {
                 w.wave(
                     capacity as usize,
-                    CompressorWave::device_bytes(layer, capacity as usize)?,
+                    CompressorWave::device_bytes(layer, capacity as usize, pad_rows)?,
                 )
             })
             .collect::<Result<Vec<_>>>()?;

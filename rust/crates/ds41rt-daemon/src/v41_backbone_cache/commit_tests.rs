@@ -1,5 +1,5 @@
 use super::*;
-use crate::v41_compressor::CompressorWeights;
+use crate::v41_compressor::{CompressorWeights, PadRowsPolicy};
 use crate::v41_window::WindowWeights;
 use ds41rt_ffi::Ds41rtDeviceBuffer;
 
@@ -28,7 +28,7 @@ fn placed_cache_commits_match_direct_and_preserve_peer_requests() -> Result<()> 
         PlacedProducerWaves::new(&weights,16,PlacedProducerWaves::device_bytes(&lib,placement,16)?)?];
     let mut rw = reference_weights.iter().map(|weights| weights.wave(16,WindowWave::device_bytes(&lib,16)?))
         .collect::<Result<Vec<_>>>()?;
-    let mut rs = reference_sources.iter().zip(SOURCES).map(|(weights,layer)| weights.wave(16,CompressorWave::device_bytes(layer,16)?))
+    let mut rs = reference_sources.iter().zip(SOURCES).map(|(weights,layer)| weights.wave(16,CompressorWave::device_bytes(layer,16,PadRowsPolicy::from_env()?)?))
         .collect::<Result<Vec<_>>>()?;
     let leases = [bank.begin_request(0,11)?,bank.begin_request(1,22)?];
     let refs = [reference.begin_request(0,11)?,reference.begin_request(1,22)?];
@@ -434,7 +434,7 @@ fn real_all_cache_commits_preserve_prefixes_and_revoke_partial_failure() -> Resu
         .map(|(w, l)| {
             w.wave(
                 capacity as usize,
-                CompressorWave::device_bytes(l, capacity as usize)?,
+                CompressorWave::device_bytes(l, capacity as usize, PadRowsPolicy::from_env()?)?,
             )
         })
         .collect::<Result<Vec<_>>>()?;
