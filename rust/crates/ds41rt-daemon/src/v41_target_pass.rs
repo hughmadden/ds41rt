@@ -256,11 +256,11 @@ impl<'w, 'a> TargetPass<'w, 'a> {
         let activation_trace = if tracing::enabled!(target: "ds41rt::activation_trace", tracing::Level::DEBUG) {
             let position: u64 = std::env::var("DS41RT_ACTIVATION_TRACE_POSITION")?.parse()?;
             if batch.cache()?.positions().first() == Some(&position) {
-                let directory = std::path::PathBuf::from(std::env::var("DS41RT_ACTIVATION_TRACE_DIR")?)
-                    .join(format!("batch{id}-{stage:?}-{rows}rows"));
+                let root = std::path::PathBuf::from(std::env::var("DS41RT_ACTIVATION_TRACE_DIR")?);
+                let directory = root.join(format!("batch{id}-{stage:?}-{rows}rows"));
                 std::fs::create_dir_all(&directory)?;
                 std::fs::write(directory.join("positions.json"), serde_json::to_vec(&batch.cache()?.positions())?)?;
-                Some(directory)
+                Some((directory, root.join("projection-weights")))
             } else { None }
         } else { None };
         ensure!(
@@ -359,7 +359,7 @@ impl<'w, 'a> TargetPass<'w, 'a> {
                 tracing::debug!(target: "ds41rt::timing", layer, rows, advance_us, engram_us, taps_us=tapped_us-advance_us-engram_us, begin_us=prepare_timing.elapsed().as_micros() as u64-tapped_us, "target layer preparation");
             }
             unsafe {
-                if let Some(directory) = detail_trace {
+                if let Some((directory, _)) = detail_trace {
                     self.lane.trace_query(directory)?;
                 }
                 let cooperative = requests.cooperative_completion();
@@ -379,8 +379,8 @@ impl<'w, 'a> TargetPass<'w, 'a> {
                             &mut self.lane, &mut self.index)
                     }
                 })?;
-                let prepared = if let Some(directory) = detail_trace {
-                    prepared.trace_input(directory).await?
+                let prepared = if let Some((directory, weights_directory)) = detail_trace {
+                    prepared.trace_input(directory, weights_directory).await?
                 } else { prepared };
                 // No RefCell guard or bank reference survives into this await.
                 let completed = prepared.execute(transport, placement, guard.batch.image_mask()).await?;
@@ -388,7 +388,7 @@ impl<'w, 'a> TargetPass<'w, 'a> {
                     self.execution.complete_layer_cooperative(guard.batch.cache()?, &mut self.lane, completed).await?;
                 } else { self.execution.complete_layer(guard.batch.cache()?, &mut self.lane, completed)?; }
             }
-            if let Some(directory) = &activation_trace {
+            if let Some((directory, _)) = &activation_trace {
                 self.lane.trace_output(directory)?;
             }
         }

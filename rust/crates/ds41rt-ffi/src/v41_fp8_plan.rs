@@ -125,6 +125,18 @@ impl V41Fp8Plan<'_> {
         Ok(buffer)
     }
 
+    /// Inspect the exact variant/scratch selected by the production launch.
+    /// This performs no launch, requantization, allocation or synchronization.
+    /// # Safety
+    /// The supplied arena belongs to this plan and all producer/consumer CUDA
+    /// work has completed. Retain it and this plan through the diagnostic copy;
+    /// do not mutate or reuse either while reading the returned descriptor.
+    pub unsafe fn completed_scratch(&self, scratch: Ds41rtDeviceBuffer, rows: u32)
+        -> Result<(V41Fp8Info, Ds41rtDeviceBuffer)> {
+        let (kernel, offset) = self.select(rows)?;
+        Ok((kernel.info(), self.scratch_slice(scratch, kernel, *offset)?))
+    }
+
     /// # Safety
     /// Same current-device ownership as V41Fp8Kernel::initialize_scratch. Run
     /// once outside graph capture; the entire arena stays live through replay.

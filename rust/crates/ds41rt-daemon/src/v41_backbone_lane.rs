@@ -118,7 +118,12 @@ pub(crate) struct PendingLaneFfn<'s, 'w, 'a> {
     values: Option<Ds41rtDeviceBuffer>,
 }
 impl<'s, 'w, 'a> PendingLaneFfn<'s, 'w, 'a> {
-    pub async fn complete(mut self) -> Result<LaneFfn<'s, 'w, 'a>> {
+    pub async fn complete(self) -> Result<LaneFfn<'s, 'w, 'a>> { self.complete_inner(None).await }
+    pub async fn complete_traced(self, directory: &std::path::Path, weights_directory: &std::path::Path)
+        -> Result<LaneFfn<'s, 'w, 'a>> {
+        self.complete_inner(Some((directory, weights_directory))).await
+    }
+    async fn complete_inner(mut self, trace: Option<(&std::path::Path, &std::path::Path)>) -> Result<LaneFfn<'s, 'w, 'a>> {
         if self.values.is_none() {
             let lane = self.lane.as_deref_mut().unwrap();
             let query = lane.query.output()?;
@@ -128,11 +133,16 @@ impl<'s, 'w, 'a> PendingLaneFfn<'s, 'w, 'a> {
             self.values = Some(lane.block.graph_normalized_storage(query.rows));
         }
         self.lane.as_ref().unwrap().sparse.wait_chain().await?;
+        if let Some((directory, weights_directory)) = trace {
+            let lane = self.lane.as_ref().unwrap();
+            let rows = lane.query.output()?.rows;
+            unsafe { lane.projection.trace_completed(rows, directory, weights_directory)?; }
+        }
         let lane = self.lane.take().unwrap();
         let input = unsafe { lane.block.complete_queued_ffn(self.values.unwrap())? };
         lane.phase = Phase::Ffn;
         Ok(LaneFfn { input, cooperative: true, shared: &mut lane.shared, router: &mut lane.router,
-            library: lane.weights.library, phase: &mut lane.phase,
+            library: lane.weights.library, projection: &lane.projection, phase: &mut lane.phase,
             route_capture: if lane.capture_routes { Some(&mut lane.route_capture) } else { None } })
     }
 }
@@ -156,10 +166,15 @@ pub(crate) struct LaneFfn<'s, 'w, 'a> {
     shared: &'s mut Option<BackboneSharedWave<'w, 'a>>,
     router: &'s mut BackboneRouterWave<'w, 'a>,
     library: &'a NativeLibrary,
+    projection: &'s AttentionOutputWave<'w, 'a>,
     phase: &'s mut Phase,
     route_capture: Option<&'s mut Vec<Vec<[u32; 6]>>>,
 }
 impl LaneFfn<'_, '_, '_> {
+    pub fn trace_projection(&self, directory: &std::path::Path, weights_directory: &std::path::Path) -> Result<()> {
+        // Both constructors wait for the containing chain before publishing FFN.
+        unsafe { self.projection.trace_completed(self.input.tokens.len(), directory, weights_directory) }
+    }
     pub fn trace_input(&self, directory: &std::path::Path) -> Result<()> {
         trace_buffers(self.library, directory, self.input.layer, &[
             ("ffn-residual", self.input.residual),
@@ -565,6 +580,7 @@ impl<'w, 'a> BackboneLane<'w, 'a> {
             shared: &mut self.shared,
             router: &mut self.router,
             library: self.weights.library,
+            projection: &self.projection,
             phase: &mut self.phase,
             route_capture: if self.capture_routes { Some(&mut self.route_capture) } else { None },
         })
@@ -743,7 +759,7 @@ impl<'w, 'a> BackboneLane<'w, 'a> {
     }
 }
 
-fn trace_buffers(library: &NativeLibrary, directory: &std::path::Path,
+pub(crate) fn trace_buffers(library: &NativeLibrary, directory: &std::path::Path,
     layer: usize, buffers: &[(&str, Ds41rtDeviceBuffer)]) -> Result<()> {
     use std::io::Write;
     for &(name, buffer) in buffers {

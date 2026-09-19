@@ -70,10 +70,10 @@ impl CompletedLayer<'_> {
     }
 }
 impl PreparedLayer<'_, '_, '_> {
-    pub async fn trace_input(mut self, directory: &std::path::Path) -> Result<Self> {
+    pub async fn trace_input(mut self, directory: &std::path::Path, weights_directory: &std::path::Path) -> Result<Self> {
         let ffn = match self.ffn {
-            PreparedFfn::Ready(ffn) => ffn,
-            PreparedFfn::Pending(pending) => pending.complete().await?,
+            PreparedFfn::Ready(ffn) => { ffn.trace_projection(directory, weights_directory)?; ffn },
+            PreparedFfn::Pending(pending) => pending.complete_traced(directory, weights_directory).await?,
         };
         ffn.trace_input(directory)?;
         self.ffn = PreparedFfn::Ready(ffn);
