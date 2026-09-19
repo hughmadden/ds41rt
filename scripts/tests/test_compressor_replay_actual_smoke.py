@@ -55,6 +55,20 @@ def test_actual_only_smoke_report_invariants():
     assert report["counterfactual_count"] == (
         report["counterfactuals_with_empty_oracles"]
     )
+    # The replacement row-case planners replaced the old C8 (broken geometry)
+    # with C14 and added D24; every experiment is validated before any device
+    # work.  The deliberate new total is A6 + B9 + C14 + D24 + P24 = 77
+    # (the old unvalidated draft reported 47).
+    assert report["experiment_total"] == 77
+    assert report["experiment_kinds"] == {"A": 6, "B": 9, "C": 14, "D": 24,
+                                          "P": 24}
+    assert report["baseline_count"] == 26          # A/B baselines + D originals
+    assert report["counterfactual_count"] == 51
+    assert report["reference_selection"] == {
+        "rule": "unique_single_row",
+        "refname": "lane0-batch20-Full-1rows",
+        "rows": 1,
+    }
     padded = report["padded"]
     assert padded["count"] == 24
     assert padded["slots"] == {"2": [0, 1], "16": [0, 1, 7, 15]}

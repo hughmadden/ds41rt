@@ -142,17 +142,27 @@ def write_synthetic_capture(
     weights_dir: Optional[Path] = None,
     write_weights: bool = True,
     device_matches_host: bool = True,
+    frequency_row: Optional[bytes] = None,
 ) -> Path:
     """Write one synthetic capture directory and return its path.
 
     When ``weights_writer`` is true this manifest carries the full tensor list
     (a first writer) and writes the shared files; otherwise it records
     ``already_written_for_root`` and is bound to a sibling first writer.
+
+    ``frequency_row`` lets callers pin the one-row FP32 ``[32, 2]`` p41
+    frequency slice; it is tiled across the batch so different captures share
+    byte-identical p41 frequencies, exactly like the actual traces.  When
+    omitted, each capture/row keeps its own random slice.
     """
     if geometry not in GEOMETRIES:
         raise ValueError(f"unknown geometry {geometry!r}")
     if not (1 <= slot_count <= 16):
         raise ValueError("slot_count outside 1..16")
+    if frequency_row is not None and len(frequency_row) != 32 * 2 * 4:
+        raise ValueError(
+            f"frequency_row must be 32*2*4 bytes, got {len(frequency_row)}"
+        )
     root = Path(root)
     positions, descriptors, chunks = _chunk_geometry(geometry, slot_count)
     rows = len(positions)
@@ -178,7 +188,8 @@ def write_synthetic_capture(
     put("output_before_kv_pack", "output", "bfloat16", (rows, LATENT_DIM),
         _finite_bf16(rng, rows * LATENT_DIM))
     put("frequencies", "frequencies", "float32", (rows, 32, 2),
-        _finite_f32(rng, rows * 32 * 2))
+        (frequency_row * rows if frequency_row is not None
+         else _finite_f32(rng, rows * 32 * 2)))
     put("positions", "positions", "uint64", (rows,),
         _u64([0 if pos % 2 == 0 else pos - 1 for pos in positions]))
     put("kv_values", "kv-values", "fp4e2m1", (rows, LATENT_DIM),

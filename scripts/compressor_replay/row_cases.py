@@ -32,8 +32,11 @@ role that no stage ever produced).
 
 Only C/D live here.  The two public planners are wire-compatible with
 ``runner.PlannedExperiment`` / ``runner.PlannedOperand``; nothing is imported
-from ``experiments.py`` (no import cycles).  CPU only: no torch, no CUDA, no
-native library, and the actual-capture adapter is strictly read-only.
+from ``experiments.py`` (no import cycles).  Captures are the shared, fully
+validated ``schema.Capture`` objects produced by ``schema.load_captures`` /
+``schema.load_capture``; there is no private capture adapter.  Structural plan
+checks use the shared ``validation.validate_experiment``.  CPU only: no torch,
+no CUDA, and no native library.
 """
 
 from __future__ import annotations
@@ -41,13 +44,11 @@ from __future__ import annotations
 import hashlib
 import json
 from dataclasses import dataclass
-from pathlib import Path
 from typing import Any, Dict, List, Optional, Sequence, Tuple
 
 from .runner import PlannedExperiment, PlannedOperand
 from .schema import (
     DESCRIPTOR_SENTINEL,
-    EARLIER_WAVE_ROW,
     INVALID_SENTINEL,
     LATENT_DIM,
     PENDING_ROW_BYTES,
@@ -57,6 +58,7 @@ from .schema import (
     UNRESOLVED,
     resolve_predecessor,
 )
+from .validation import validate_experiment
 
 RATIO = 2
 
@@ -65,10 +67,6 @@ C_OUTPUTS = ("projected", "scores", "output", "values", "scales")
 D_OUTPUTS = ("output", "values", "scales")
 
 FREQ_ROW_BYTES = 32 * 2 * 4                 # FP32 [1, 32, 2]
-NORM_BYTES = LATENT_DIM * 2                 # BF16 [512]
-WEIGHT_PROJ_BYTES = LATENT_DIM * SOURCE_DIM * 2   # BF16 [512, 5120]
-
-DTYPE_ITEM_BYTES = {"uint8": 1, "uint64": 8, "float32": 4, "bfloat16": 2}
 
 WEIGHT_ROLES = ("wkv", "wgate", "norm")
 
@@ -129,433 +127,6 @@ def _pool_pack_stages(slots: int) -> List[dict]:
         {"kind": "pack", "input": "output", "frequencies": "frequencies",
          "values": "values", "scales": "scales"},
     ]
-
-
-# ---------------------------------------------------------------------------
-# Actual-capture adapter (read-only; replaces nothing, edits nothing).
-# ---------------------------------------------------------------------------
-
-_ADAPTER_REQUIRED_BUFFERS = (
-    "input", "projected", "scores", "output", "frequencies", "positions",
-    "kv-values", "kv-scales", "pending-kv", "pending-scores",
-)
-
-_ADAPTER_ROW_BYTES = {
-    "input": ROW_BYTES["input"],
-    "projected": ROW_BYTES["projected"],
-    "scores": ROW_BYTES["scores"],
-    "output": ROW_BYTES["output"],
-    "frequencies": ROW_BYTES["frequencies"],
-    "positions": ROW_BYTES["positions"],
-    "kv-values": ROW_BYTES["kv-values"],
-    "kv-scales": ROW_BYTES["kv-scales"],
-    "pending-kv": PENDING_ROW_BYTES,
-    "pending-scores": PENDING_ROW_BYTES,
-    "descriptors-device": 8,
-}
-
-_ADAPTER_DTYPES = {
-    "input": "bfloat16", "projected": "float32", "scores": "float32",
-    "output": "bfloat16", "frequencies": "float32", "positions": "uint64",
-    "kv-values": "fp4e2m1", "kv-scales": "fp8e4m3",
-    "pending-kv": "float32", "pending-scores": "float32",
-    "descriptors-device": "uint64",
-}
-
-
-def _expected_shape(name: str, rows: int, slot_count: int) -> Tuple[int, ...]:
-    if name in ("pending-kv", "pending-scores"):
-        return (slot_count, LATENT_DIM)
-    if name == "frequencies":
-        return (rows, 32, 2)
-    if name in ("positions", "descriptors-device"):
-        return (rows,)
-    if name == "kv-values":
-        return (rows, 256 * 2)
-    if name == "kv-scales":
-        return (rows, 32)
-    if name == "input":
-        return (rows, SOURCE_DIM)
-    return (rows, LATENT_DIM)
-
-
-@dataclass
-class _BufferFile:
-    name: str
-    path: Path
-    dtype: str
-    shape: Tuple[int, ...]
-    bytes: int
-
-
-class ActualCapture:
-    """Read-only view over one actual compressor-inputs capture directory.
-
-    Exposes exactly the surface the planners use: ``read_buffer``,
-    ``read_weight``, ``device_descriptors``, ``slot_count``, ``rows``,
-    ``wave_rows``, ``chunks`` (plus ``ratio``/``layer``/``directory``).
-    Buffers are keyed by the record ``name`` (production JSON keys differ:
-    ``output_before_kv_pack``, ``kv_values``, ...); the *device* descriptor
-    bytes stay authoritative.  This adapter exists because the draft
-    ``schema.load_capture`` is currently broken against the actual manifests
-    and is owned elsewhere; nothing here writes to the capture tree.
-    """
-
-    def __init__(self, directory: Path, manifest_path: Path,
-                 buffers: Dict[str, _BufferFile],
-                 weights: Dict[str, _BufferFile],
-                 manifest: dict, manifest_sha256: str,
-                 device_descriptors: Tuple[int, ...],
-                 host_descriptors: Optional[Tuple[int, ...]]):
-        self.directory = Path(directory)
-        self.manifest_path = Path(manifest_path)
-        self.manifest_sha256 = manifest_sha256
-        self.layer = manifest["layer"]
-        self.ratio = manifest["ratio"]
-        self.rows = manifest["rows"]
-        self.slot_count = manifest["slot_count"]
-        self.buffers = buffers
-        self.weights = weights
-        self.device_descriptors = device_descriptors
-        self.host_descriptors = host_descriptors
-        self.device_matches_host = (
-            None if host_descriptors is None
-            else device_descriptors == host_descriptors
-        )
-        self.wave_rows: Tuple[dict, ...] = tuple(manifest.get("wave_rows") or ())
-        self.chunks: Tuple[dict, ...] = tuple(manifest.get("chunks") or ())
-        self.pending_slots: Tuple[dict, ...] = tuple(
-            (manifest.get("pending") or {}).get("slots") or ())
-        self._buffer_cache: Dict[str, bytes] = {}
-        self._weight_cache: Dict[str, bytes] = {}
-
-    # -- byte access ------------------------------------------------------
-    def read_buffer(self, name: str) -> bytes:
-        if name in self._buffer_cache:
-            return self._buffer_cache[name]
-        ref = self.buffers.get(name)
-        if ref is None:
-            raise RowCaseError(
-                f"capture {self.directory.name}: buffer {name!r} not present"
-            )
-        blob = ref.path.read_bytes()
-        if len(blob) != ref.bytes:
-            raise RowCaseError(
-                f"capture {self.directory.name}: buffer {name!r} is "
-                f"{len(blob)} bytes, manifest promised {ref.bytes}"
-            )
-        self._buffer_cache[name] = blob
-        return blob
-
-    def read_weight(self, role: str) -> bytes:
-        if role in self._weight_cache:
-            return self._weight_cache[role]
-        ref = self.weights.get(role)
-        if ref is None:
-            raise RowCaseError(
-                f"capture {self.directory.name}: weight {role!r} not resolved"
-            )
-        blob = ref.path.read_bytes()
-        if len(blob) != ref.bytes:
-            raise RowCaseError(
-                f"capture {self.directory.name}: weight {role!r} is "
-                f"{len(blob)} bytes, expected {ref.bytes}"
-            )
-        self._weight_cache[role] = blob
-        return blob
-
-    # -- convenience ------------------------------------------------------
-    def request_id(self, row: int) -> int:
-        return self.wave_rows[row]["request_id"]
-
-    def position(self, row: int) -> int:
-        return self.wave_rows[row]["absolute_position"]
-
-    def summary(self) -> dict:
-        return {
-            "name": self.directory.name,
-            "manifest_sha256": self.manifest_sha256,
-            "layer": self.layer,
-            "rows": self.rows,
-            "slot_count": self.slot_count,
-            "device_descriptors": list(self.device_descriptors),
-            "request_ids": [self.request_id(r) for r in range(self.rows)],
-            "positions": [self.position(r) for r in range(self.rows)],
-        }
-
-
-def load_actual_capture(directory: Path, *, manifest_path: Optional[Path] = None,
-                        weights_dir: Optional[Path] = None) -> ActualCapture:
-    """Load and structurally validate one actual capture (read-only).
-
-    Validation is structural and loud: schema/kind/ratio/rows/slot_count,
-    buffer records (keyed by record name), device descriptor bytes vs the
-    manifest wave rows, chunk/lease geometry and the completed-latent
-    invariants.  Anything unexpected raises :class:`RowCaseError`; nothing is
-    fabricated, substituted or written.
-    """
-    directory = Path(directory)
-    if manifest_path is None:
-        manifests = sorted(directory.glob("layer*-compressor-inputs.json"))
-        if len(manifests) != 1:
-            raise RowCaseError(
-                f"{directory}: expected exactly one layer*-compressor-"
-                f"inputs.json manifest, found {len(manifests)}"
-            )
-        manifest_path = manifests[0]
-    manifest_path = Path(manifest_path)
-    try:
-        manifest = json.loads(manifest_path.read_text())
-    except (OSError, json.JSONDecodeError) as error:
-        raise RowCaseError(f"manifest unreadable: {manifest_path}: {error}")
-
-    if manifest.get("schema") != 1:
-        raise RowCaseError(f"manifest schema {manifest.get('schema')!r} != 1")
-    if manifest.get("kind") != "compressor-inputs":
-        raise RowCaseError(f"manifest kind {manifest.get('kind')!r} unsupported")
-    if manifest.get("ratio") != RATIO:
-        raise RowCaseError(
-            f"capture ratio {manifest.get('ratio')!r}: row cases replay the "
-            "ratio-two producer only"
-        )
-    rows = manifest.get("rows")
-    if rows not in (1, 2):
-        raise RowCaseError(f"capture rows {rows!r}: expected a 1- or 2-row batch")
-    slot_count = manifest.get("slot_count")
-    if not isinstance(slot_count, int) or not 1 <= slot_count <= 16:
-        raise RowCaseError(f"slot_count {slot_count!r} outside 1..16")
-    layer = manifest.get("layer")
-
-    # -- buffers, keyed by each record's own name -------------------------
-    records: Dict[str, dict] = {}
-    for record in (manifest.get("buffers") or {}).values():
-        if record is not None:
-            records[record["name"]] = record
-    pending = manifest.get("pending") or {}
-    for key in ("kv", "scores"):
-        record = pending.get(key)
-        if record is not None:
-            records[record["name"]] = record
-    descriptors_info = manifest.get("descriptors") or {}
-    device_file = descriptors_info.get("device_file")
-    if device_file:
-        records["descriptors-device"] = {
-            "name": "descriptors-device", "file": device_file,
-            "dtype": "uint64", "shape": [rows], "bytes": rows * 8,
-        }
-    missing = [n for n in _ADAPTER_REQUIRED_BUFFERS if n not in records]
-    if missing:
-        raise RowCaseError(f"manifest is missing buffers: {missing}")
-
-    buffers: Dict[str, _BufferFile] = {}
-    for name, record in records.items():
-        path = directory / record["file"]
-        if not path.is_file():
-            raise RowCaseError(f"capture buffer file missing: {path}")
-        row_bytes = _ADAPTER_ROW_BYTES[name]
-        count = slot_count if name in ("pending-kv", "pending-scores") else rows
-        expected_bytes = count * row_bytes
-        if record.get("bytes") != expected_bytes:
-            raise RowCaseError(
-                f"buffer {name!r} bytes {record.get('bytes')} != expected "
-                f"{expected_bytes}"
-            )
-        if path.stat().st_size != expected_bytes:
-            raise RowCaseError(
-                f"buffer {name!r} file size {path.stat().st_size} != "
-                f"{expected_bytes}"
-            )
-        shape = tuple(record.get("shape") or ())
-        if shape != _expected_shape(name, rows, slot_count):
-            raise RowCaseError(
-                f"buffer {name!r} shape {shape} != expected "
-                f"{_expected_shape(name, rows, slot_count)}"
-            )
-        if record.get("dtype") != _ADAPTER_DTYPES[name]:
-            raise RowCaseError(
-                f"buffer {name!r} dtype {record.get('dtype')!r} != "
-                f"{_ADAPTER_DTYPES[name]!r}"
-            )
-        buffers[name] = _BufferFile(name, path, record["dtype"], shape,
-                                    expected_bytes)
-
-    device_blob = buffers["descriptors-device"].path.read_bytes()
-    device_descriptors = tuple(
-        int.from_bytes(device_blob[i:i + 8], "little")
-        for i in range(0, len(device_blob), 8)
-    )
-    if len(device_descriptors) != rows:
-        raise RowCaseError(
-            f"device descriptor count {len(device_descriptors)} != rows {rows}"
-        )
-    host_path = directory / (descriptors_info.get("host_file")
-                             or f"layer{layer}-compressor-descriptors-host.bin")
-    host_descriptors = None
-    if host_path.is_file():
-        host_blob = host_path.read_bytes()
-        host_descriptors = tuple(
-            int.from_bytes(host_blob[i:i + 8], "little")
-            for i in range(0, len(host_blob), 8)
-        )
-
-    wave_rows = tuple(manifest.get("wave_rows") or ())
-    if len(wave_rows) != rows:
-        raise RowCaseError(f"wave_rows {len(wave_rows)} != rows {rows}")
-    chunks = tuple(manifest.get("chunks") or ())
-    if not chunks:
-        raise RowCaseError("manifest has no chunks")
-
-    # -- weights ----------------------------------------------------------
-    weights_info = manifest.get("weights") or {}
-    weight_files = {
-        "wkv": (f"layer{layer}-compressor-wkv-weight.bin", WEIGHT_PROJ_BYTES),
-        "wgate": (f"layer{layer}-compressor-wgate-weight.bin", WEIGHT_PROJ_BYTES),
-        "norm": (f"layer{layer}-compressor-norm-weight.bin", NORM_BYTES),
-    }
-    candidates: List[Path] = []
-    if weights_dir is not None:
-        candidates.append(Path(weights_dir))
-    declared = weights_info.get("directory")
-    if declared:
-        declared_path = Path(declared)
-        candidates.append(
-            declared_path if declared_path.is_absolute()
-            else directory / declared_path
-        )
-        # Actual manifests declare the device-side path (/trace/...); the
-        # local mirror sits beside the capture directories.
-        candidates.append(directory.parent / Path(declared).name)
-        candidates.append(directory / Path(declared).name)
-    candidates.append(directory)
-    weights: Dict[str, _BufferFile] = {}
-    weight_problems: List[str] = []
-    for role, (file_name, expected_bytes) in weight_files.items():
-        resolved = None
-        for candidate in candidates:
-            path = candidate / file_name
-            if path.is_file() and path.stat().st_size == expected_bytes:
-                resolved = path
-                break
-        if resolved is None:
-            weight_problems.append(
-                f"{role} ({file_name}, {expected_bytes} bytes) not found in "
-                + " | ".join(str(c) for c in candidates)
-            )
-            continue
-        weights[role] = _BufferFile(role, resolved, "bfloat16", (),
-                                    expected_bytes)
-    if weight_problems:
-        raise RowCaseError(
-            "weight resolution failed for " + "; ".join(weight_problems)
-        )
-
-    capture = ActualCapture(
-        directory=directory, manifest_path=manifest_path, buffers=buffers,
-        weights=weights, manifest=manifest,
-        manifest_sha256=_sha256(manifest_path.read_bytes()),
-        device_descriptors=device_descriptors,
-        host_descriptors=host_descriptors,
-    )
-    _validate_actual_geometry(capture)
-    return capture
-
-
-def _validate_actual_geometry(capture: ActualCapture) -> None:
-    """Structural geometry checks (the planner adds semantic checks)."""
-    rows, slot_count = capture.rows, capture.slot_count
-    by_index = {c.get("index"): c for c in capture.chunks}
-    leases: Dict[int, int] = {}
-    for chunk in capture.chunks:
-        lease_slot = (chunk.get("lease") or {}).get("slot")
-        if not isinstance(lease_slot, int) or not 0 <= lease_slot < slot_count:
-            raise RowCaseError(
-                f"chunk {chunk.get('index')} lease slot {lease_slot!r} "
-                f"outside 0..{slot_count - 1}"
-            )
-        owner = leases.setdefault(lease_slot, chunk.get("index"))
-        if owner != chunk.get("index"):
-            raise RowCaseError(
-                f"pending slot {lease_slot} is leased by chunks {owner} and "
-                f"{chunk.get('index')}: two active leases on one slot"
-            )
-    for row in range(rows):
-        wave_row = capture.wave_rows[row]
-        if wave_row.get("row") is not None and wave_row["row"] != row:
-            raise RowCaseError(f"wave_rows[{row}] claims row {wave_row['row']}")
-        descriptor = capture.device_descriptors[row]
-        if wave_row.get("device_descriptor") != descriptor:
-            raise RowCaseError(
-                f"row {row} device bytes say descriptor {descriptor:#x} but "
-                f"manifest wave_rows says {wave_row.get('device_descriptor')!r}"
-            )
-        chunk = by_index.get(wave_row.get("chunk"))
-        if chunk is None:
-            raise RowCaseError(
-                f"row {row} references unknown chunk {wave_row.get('chunk')!r}"
-            )
-        if chunk.get("request_id") != wave_row.get("request_id"):
-            raise RowCaseError(
-                f"row {row} request {wave_row.get('request_id')} disagrees "
-                f"with chunk {chunk.get('index')} request "
-                f"{chunk.get('request_id')}"
-            )
-        lo, hi = (chunk.get("flattened_row_range") or
-                  [chunk.get("prepared_offset"),
-                   chunk.get("prepared_offset", 0) + chunk.get("tokens", 1)])
-        if not lo <= row < hi:
-            raise RowCaseError(
-                f"row {row} outside its chunk {chunk.get('index')} range "
-                f"[{lo}, {hi})"
-            )
-        chunk_positions = chunk.get("absolute_positions") or list(
-            range(chunk.get("position", 0),
-                  chunk.get("position", 0) + chunk.get("tokens", 1)))
-        expected_position = chunk_positions[row - lo]
-        if wave_row.get("absolute_position") != expected_position:
-            raise RowCaseError(
-                f"row {row} position {wave_row.get('absolute_position')} != "
-                f"chunk position {expected_position}"
-            )
-        position = wave_row["absolute_position"]
-        predecessor = resolve_predecessor(descriptor, row, slot_count)
-        if predecessor["kind"] == UNRESOLVED:
-            raise RowCaseError(
-                f"row {row} descriptor {descriptor:#x} is unresolvable"
-            )
-        embedded = wave_row.get("predecessor")
-        if embedded is not None and embedded != predecessor:
-            raise RowCaseError(
-                f"row {row} manifest predecessor {embedded} disagrees with "
-                f"the device descriptor resolution {predecessor}"
-            )
-        if position % RATIO == 0:
-            if descriptor != DESCRIPTOR_SENTINEL:
-                raise RowCaseError(
-                    f"row {row} at even position {position} carries "
-                    f"descriptor {descriptor:#x}, expected the sentinel"
-                )
-            continue
-        if descriptor == DESCRIPTOR_SENTINEL:
-            raise RowCaseError(
-                f"row {row} at odd position {position} carries the sentinel"
-            )
-        latent = wave_row.get("completed_latent")
-        if latent is None:
-            raise RowCaseError(
-                f"row {row} at odd position {position} completes no latent"
-            )
-        first_token = position - 1
-        if latent.get("first_token") != first_token:
-            raise RowCaseError(
-                f"row {row} latent first_token {latent.get('first_token')} != "
-                f"{first_token} for position {position}"
-            )
-        if latent.get("logical_compressed_row") != first_token // RATIO:
-            raise RowCaseError(
-                f"row {row} logical_compressed_row "
-                f"{latent.get('logical_compressed_row')} != "
-                f"{first_token // RATIO}"
-            )
 
 
 # ---------------------------------------------------------------------------
@@ -957,7 +528,7 @@ def plan_candidate_geometry(capture: Any, reference: Optional[Any],
             outputs=C_OUTPUTS, expected={},
             notes=(summary, note),
         )
-        validate_experiment_plan(experiment)
+        validate_experiment(experiment)
         return experiment
 
     for row in selected:
@@ -1164,7 +735,7 @@ def plan_cross_substitution(reference: Any, candidate: Any,
             outputs=D_OUTPUTS, expected=expected,
             notes=(summary, note),
         )
-        validate_experiment_plan(experiment)
+        validate_experiment(experiment)
         return experiment
 
     for row in candidate_selected:
@@ -1270,137 +841,3 @@ def _assert_unique_names(experiments: List[PlannedExperiment]) -> None:
         raise RowCaseError(f"experiment name alias collision: {duplicates}")
 
 
-# ---------------------------------------------------------------------------
-# Plan validation (structural; used by the planners and the tests).
-# ---------------------------------------------------------------------------
-
-_STAGE_READS = {
-    "project": ("input", "weight"),
-    "pool": ("kv", "scores", "pending_kv", "pending_scores", "predecessors",
-             "norm"),
-    "pack": ("input",),          # frequencies handled optionally below
-}
-_STAGE_WRITES = {
-    "project": ("output",),
-    "pool": ("output",),
-    "pack": ("values", "scales"),
-}
-
-
-def _element_count(shape: Sequence[int]) -> int:
-    count = 1
-    for dim in shape:
-        count *= int(dim)
-    return count
-
-
-def validate_experiment_plan(experiment: PlannedExperiment) -> None:
-    """Structural validation of one planned experiment (CPU, bytes only).
-
-    Checks that every stage input role exists in the operands or a prior
-    stage output; every operand blob length matches its dtype/shape; every
-    produced role is allocated in ``outputs``; pool predecessors address one
-    descriptor per row; pending planes carry one row per slot; pack
-    frequencies carry one slice per row; gated cases carry expected bytes and
-    counterfactuals carry none.
-    """
-    name = experiment.name
-    roles: Dict[str, PlannedOperand] = {}
-    for operand in experiment.operands:
-        if operand.role in roles:
-            raise RowCaseError(
-                f"{name}: operand role {operand.role!r} appears twice"
-            )
-        if operand.dtype not in DTYPE_ITEM_BYTES:
-            raise RowCaseError(
-                f"{name}: operand {operand.role} has unknown dtype "
-                f"{operand.dtype!r}"
-            )
-        expected_len = _element_count(operand.shape) * DTYPE_ITEM_BYTES[
-            operand.dtype]
-        if len(operand.blob) != expected_len:
-            raise RowCaseError(
-                f"{name}: operand {operand.role} is {len(operand.blob)} bytes, "
-                f"shape {tuple(operand.shape)} x {operand.dtype} needs "
-                f"{expected_len}"
-            )
-        roles[operand.role] = operand
-
-    if experiment.rows < 1 or experiment.slots < 1:
-        raise RowCaseError(f"{name}: rows/slots must be positive")
-
-    available = set(roles)
-    produced: set = set()
-    for stage in experiment.stages:
-        kind = stage.get("kind")
-        if kind not in _STAGE_READS:
-            raise RowCaseError(f"{name}: unknown stage kind {kind!r}")
-        for key in _STAGE_READS[kind]:
-            role = stage.get(key)
-            if role is None:
-                raise RowCaseError(f"{name}: {kind} stage misses {key!r}")
-            if role not in available:
-                raise RowCaseError(
-                    f"{name}: {kind} stage input {role!r} exists in neither "
-                    "the operands nor a prior stage output"
-                )
-        if kind == "pack" and stage.get("frequencies") is not None:
-            if stage["frequencies"] not in available:
-                raise RowCaseError(
-                    f"{name}: pack frequencies role "
-                    f"{stage['frequencies']!r} is missing"
-                )
-        for key in _STAGE_WRITES[kind]:
-            role = stage[key]
-            if role in roles:
-                raise RowCaseError(
-                    f"{name}: {kind} stage writes {role!r} which is also an "
-                    "operand role"
-                )
-            if role not in experiment.outputs:
-                raise RowCaseError(
-                    f"{name}: {kind} stage produces {role!r} which is not "
-                    f"allocated in outputs {experiment.outputs}"
-                )
-            produced.add(role)
-        available |= {stage[key] for key in _STAGE_WRITES[kind]}
-
-    if experiment.counterfactual:
-        if experiment.expected:
-            raise RowCaseError(
-                f"{name}: counterfactual carries an expected gate — "
-                "counterfactuals never gate"
-            )
-    else:
-        if not experiment.expected:
-            raise RowCaseError(
-                f"{name}: gated experiment has no expected bytes"
-            )
-        for role, blob in experiment.expected.items():
-            if role not in experiment.outputs:
-                raise RowCaseError(
-                    f"{name}: expected role {role!r} is not an output role"
-                )
-
-    descriptors = roles.get("predecessors")
-    if descriptors is not None:
-        if len(descriptors.blob) != experiment.rows * 8:
-            raise RowCaseError(
-                f"{name}: predecessors operand holds "
-                f"{len(descriptors.blob) // 8} descriptors for "
-                f"{experiment.rows} rows"
-            )
-    for plane in ("pending_kv", "pending_scores"):
-        operand = roles.get(plane)
-        if operand is not None and operand.shape[0] != experiment.slots:
-            raise RowCaseError(
-                f"{name}: {plane} plane has {operand.shape[0]} rows but the "
-                f"experiment declares {experiment.slots} slots"
-            )
-    frequencies = roles.get("frequencies")
-    if frequencies is not None:
-        if frequencies.shape != (experiment.rows, 32, 2):
-            raise RowCaseError(
-                f"{name}: frequencies shape {frequencies.shape} != "
-                f"({experiment.rows}, 32, 2) — exactly one slice per row"
-            )

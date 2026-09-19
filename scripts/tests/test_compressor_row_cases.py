@@ -5,9 +5,11 @@ the capture API (``read_buffer``/``read_weight``/``device_descriptors``/
 ``slot_count``/``rows``/``wave_rows``/``chunks``) with DISTINCT current,
 pending and frequency bytes per request and two odd p41 rows, so every
 addressing or slicing mistake is detectable byte-for-byte.  The actual
-immutable capture adapter is exercised ONLY by the read-only actual-plan
-smoke tests at the bottom (no reliance on the draft ``schema.load_capture``,
-which is currently broken and owned elsewhere).
+immutable captures are loaded with the shared, corrected
+``schema.load_capture``; there is no private capture adapter left in
+``row_cases``.  Structural checks go through the shared
+``validation.validate_experiment``; ``RowCaseError`` remains only for row
+ownership / provenance mistakes.
 
 CPU only: no GPU executor, no fake CUDA, no whole checkpoint or shared pool
 load.  Everything here validates *plans* (roles, bytes, provenance, gates).
@@ -26,6 +28,11 @@ if str(SCRIPT_DIR) not in sys.path:
     sys.path.insert(0, str(SCRIPT_DIR))
 
 from compressor_replay import row_cases as rc            # noqa: E402
+from compressor_replay import schema                      # noqa: E402
+from compressor_replay.validation import (               # noqa: E402
+    ValidationError,
+    validate_experiment,
+)
 from compressor_replay.runner import PlannedExperiment, PlannedOperand  # noqa: E402
 from compressor_replay.schema import DESCRIPTOR_SENTINEL  # noqa: E402
 
@@ -220,7 +227,7 @@ def assert_well_formed(experiments):
     names = [e.name for e in experiments]
     assert len(names) == len(set(names)), "experiment name alias collision"
     for experiment in experiments:
-        rc.validate_experiment_plan(experiment)     # must not raise
+        validate_experiment(experiment)             # shared validator
         for op in experiment.operands:
             assert isinstance(op.blob, bytes)
         for stage in experiment.stages:
@@ -683,32 +690,50 @@ def test_operand_bytes_pass_through_untouched():
 
 
 # ---------------------------------------------------------------------------
-# Plan validation (negative cases).
+# Plan validation (negative cases) through the shared validator.
 # ---------------------------------------------------------------------------
 
-def minimal_experiment(**overrides):
-    blob2048 = tagged("X", PENDING_ROW)
+def pool_experiment(**overrides):
+    """A minimal structurally valid pool-only plan (rows=1, slots=1)."""
     experiment = PlannedExperiment(
         name="minimal", kind="C", rows=1, slots=1, counterfactual=True,
         operands=[
-            PlannedOperand("input", tagged("I", INPUT_ROW), "bfloat16",
-                           (1, SOURCE), "test"),
-            PlannedOperand("pending_kv", blob2048, "float32", (1, LATENT),
-                           "test"),
-            PlannedOperand("pending_scores", blob2048, "float32",
+            PlannedOperand("kv", tagged("K", PENDING_ROW), "float32",
                            (1, LATENT), "test"),
+            PlannedOperand("scores", tagged("S", PENDING_ROW), "float32",
+                           (1, LATENT), "test"),
+            PlannedOperand("pending_kv", tagged("PK", PENDING_ROW), "float32",
+                           (1, LATENT), "test"),
+            PlannedOperand("pending_scores", tagged("PS", PENDING_ROW),
+                           "float32", (1, LATENT), "test"),
             PlannedOperand("predecessors", u64([0]), "uint64", (1,), "test"),
             PlannedOperand("norm", tagged("N", NORM), "bfloat16", (LATENT,),
                            "test"),
+        ],
+        stages=[{"kind": "pool", "kv": "kv", "scores": "scores",
+                 "pending_kv": "pending_kv", "pending_scores": "pending_scores",
+                 "predecessors": "predecessors", "norm": "norm",
+                 "output": "output", "slots": 1}],
+        outputs=("output",), expected={}, notes=(),
+    )
+    for key, value in overrides.items():
+        object.__setattr__(experiment, key, value)
+    return experiment
+
+
+def pack_experiment(**overrides):
+    """A minimal structurally valid pack-only plan (rows=1)."""
+    experiment = PlannedExperiment(
+        name="pack-minimal", kind="C", rows=1, slots=1, counterfactual=True,
+        operands=[
+            PlannedOperand("output", tagged("O", LATENT * 2), "bfloat16",
+                           (1, LATENT), "test"),
             PlannedOperand("frequencies", tagged("F", FREQ_ROW), "float32",
                            (1, 32, 2), "test"),
         ],
-        stages=[{"kind": "pool", "kv": "missing_role", "scores": "scores",
-                 "pending_kv": "pending_kv", "pending_scores":
-                 "pending_scores", "predecessors": "predecessors",
-                 "norm": "norm", "output": "output", "slots": 1}],
-        outputs=("output",), expected={},
-        notes=(),
+        stages=[{"kind": "pack", "input": "output", "frequencies":
+                 "frequencies", "values": "values", "scales": "scales"}],
+        outputs=("values", "scales"), expected={}, notes=(),
     )
     for key, value in overrides.items():
         object.__setattr__(experiment, key, value)
@@ -716,88 +741,114 @@ def minimal_experiment(**overrides):
 
 
 def test_validate_rejects_missing_stage_input_role():
-    with pytest.raises(rc.RowCaseError, match="neither"):
-        rc.validate_experiment_plan(minimal_experiment())
+    experiment = pool_experiment()
+    next(s for s in experiment.stages if s["kind"] == "pool")["kv"] = \
+        "missing_role"
+    with pytest.raises(ValidationError, match="neither"):
+        validate_experiment(experiment)
 
 
 def test_validate_rejects_wrong_operand_length():
-    experiment = minimal_experiment()
+    experiment = pool_experiment()
     experiment.operands[0] = PlannedOperand(
-        "input", b"\x00" * 10, "bfloat16", (1, SOURCE), "test")
-    with pytest.raises(rc.RowCaseError, match="input is 10 bytes"):
-        rc.validate_experiment_plan(experiment)
+        "kv", b"\x00" * 10, "float32", (1, LATENT), "test")
+    with pytest.raises(ValidationError, match="bytes 10"):
+        validate_experiment(experiment)
 
 
 def test_validate_rejects_unallocated_produced_role():
-    stages = [{"kind": "pack", "input": "input", "frequencies":
-               "frequencies", "values": "values", "scales": "scales"}]
-    experiment = minimal_experiment(
-        stages=stages, outputs=("values",))
-    with pytest.raises(rc.RowCaseError, match="not.*allocated in outputs"):
-        rc.validate_experiment_plan(experiment)
+    experiment = pool_experiment(outputs=())
+    with pytest.raises(ValidationError, match="not listed in experiment.outputs"):
+        validate_experiment(experiment)
 
 
-def test_validate_rejects_counterfactual_with_gate():
-    experiment = minimal_experiment(
-        stages=[{"kind": "pool", "kv": "input", "scores": "input",
-                 "pending_kv": "pending_kv", "pending_scores":
-                 "pending_scores", "predecessors": "predecessors",
-                 "norm": "norm", "output": "output", "slots": 1}],
-        expected={"output": b"\x00" * 1024})
-    with pytest.raises(rc.RowCaseError, match="counterfactual"):
-        rc.validate_experiment_plan(experiment)
+def test_validate_tolerates_counterfactual_oracle_bytes():
+    # The shared validator treats a counterfactual oracle as optional, but any
+    # oracle it does carry must still have the exact output byte length.
+    experiment = pool_experiment(expected={"output": bytes(1024)})
+    validate_experiment(experiment)                 # tolerated, never required
+    experiment.expected["output"] = bytes(1023)
+    with pytest.raises(ValidationError, match="bytes but the output is"):
+        validate_experiment(experiment)
 
 
 def test_validate_rejects_gate_without_expected():
-    experiment = minimal_experiment(
-        counterfactual=False,
-        stages=[{"kind": "pool", "kv": "input", "scores": "input",
-                 "pending_kv": "pending_kv", "pending_scores":
-                 "pending_scores", "predecessors": "predecessors",
-                 "norm": "norm", "output": "output", "slots": 1}])
-    with pytest.raises(rc.RowCaseError, match="no expected"):
-        rc.validate_experiment_plan(experiment)
+    experiment = pool_experiment(counterfactual=False)
+    with pytest.raises(ValidationError, match="missing an exact oracle"):
+        validate_experiment(experiment)
 
 
 def test_validate_rejects_duplicate_operand_roles():
-    experiment = minimal_experiment()
+    experiment = pool_experiment()
     experiment.operands.append(experiment.operands[0])
-    with pytest.raises(rc.RowCaseError, match="appears twice"):
-        rc.validate_experiment_plan(experiment)
+    with pytest.raises(ValidationError, match="duplicate operand role"):
+        validate_experiment(experiment)
 
 
 def test_validate_rejects_misaligned_frequencies():
-    experiment = minimal_experiment(
-        stages=[{"kind": "pack", "input": "input", "frequencies":
-                 "frequencies", "values": "values", "scales": "scales"}],
-        outputs=("values", "scales"))
-    experiment.operands[5] = PlannedOperand(
-        "frequencies", tagged("F2", FREQ_ROW * 2), "float32", (2, 32, 2),
-        "test")
-    with pytest.raises(rc.RowCaseError, match="one slice per row|frequencies"):
-        rc.validate_experiment_plan(experiment)
+    experiment = pack_experiment()
+    experiment.operands = [
+        experiment.operands[0],
+        PlannedOperand("frequencies", tagged("F2", FREQ_ROW * 2), "float32",
+                       (2, 32, 2), "test"),
+    ]
+    with pytest.raises(ValidationError, match="expected 256"):
+        validate_experiment(experiment)
 
 
 # ---------------------------------------------------------------------------
-# Actual-capture adapter on a synthetic directory (CPU-only positive load).
+# Shared-schema integration: schema -> row_cases -> shared validator.
 # ---------------------------------------------------------------------------
 
-def test_adapter_loads_synthetic_capture_directory(tmp_path):
+def test_schema_rowcases_validator_integration(tmp_path):
+    from compressor_replay.fixtures import write_synthetic_capture
+
+    root = tmp_path / "activations"
+    root.mkdir()
+    freq_row = bytes((i * 17 + 5) & 0xFF for i in range(FREQ_ROW))
+    write_synthetic_capture(root, "ref-single", geometry="single",
+                            weights_writer=True, seed=11,
+                            frequency_row=freq_row)
+    write_synthetic_capture(root, "cand-pair", geometry="pair",
+                            weights_writer=False, seed=12,
+                            frequency_row=freq_row)
+    # Load through the corrected shared schema (real manifest layout).
+    reference = schema.load_capture(root / "ref-single")
+    candidate = schema.load_capture(root / "cand-pair")
+    c_cases = rc.plan_candidate_geometry(candidate, reference, tag="")
+    d_cases = rc.plan_cross_substitution(reference, candidate, tag="")
+    assert d_cases                                     # D exists for a 1-row ref
+    assert any(not e.counterfactual for e in d_cases)  # D original gates
+    # Every stage read is contract-valid on every planned experiment.
+    for experiment in c_cases + d_cases:
+        validate_experiment(experiment)
+    singles = [e for e in c_cases if e.name.endswith("_single")]
+    assert singles
+    for experiment in singles:
+        assert experiment.rows == 1 and experiment.slots == 1
+        assert len(operand(experiment, "frequencies").blob) == FREQ_ROW == 256
+
+
+# ---------------------------------------------------------------------------
+# Actual captures through the shared schema loader (skipped when absent).
+# ---------------------------------------------------------------------------
+
+def test_shared_schema_loads_synthetic_capture_directory(tmp_path):
     from compressor_replay.fixtures import write_synthetic_capture
 
     directory = write_synthetic_capture(tmp_path, "synthetic-single",
                                         geometry="single", slot_count=4,
                                         seed=7)
-    capture = rc.load_actual_capture(directory)
+    capture = schema.load_capture(directory)
     assert capture.rows == 1
     assert capture.slot_count == 4
-    assert capture.device_descriptors[0] == 2     # pending-slot addressing
+    assert capture.device_descriptors[0] == 0     # single geometry, pending slot 0
     assert capture.wave_rows[0]["absolute_position"] == 41
     experiments = rc.plan_candidate_geometry(capture, None, tag="t")
     assert_well_formed(experiments)
     single = by_name(experiments, "_row0_single")
     assert operand(single, "pending_kv").blob == row(
-        capture.read_buffer("pending-kv"), 2, PENDING_ROW)
+        capture.read_buffer("pending-kv"), 0, PENDING_ROW)
 
 
 # ---------------------------------------------------------------------------
@@ -813,8 +864,8 @@ pytestmark_actual = pytest.mark.skipif(
 @pytest.mark.parametrize("member", CANDIDATE_DIRS)
 @pytestmark_actual
 def test_actual_manifests_load_and_plan(member):
-    reference = rc.load_actual_capture(ACTIVATIONS / REFERENCE_DIR)
-    candidate = rc.load_actual_capture(ACTIVATIONS / member)
+    reference = schema.load_capture(ACTIVATIONS / REFERENCE_DIR)
+    candidate = schema.load_capture(ACTIVATIONS / member)
     experiments = (rc.plan_candidate_geometry(candidate, reference, tag="")
                    + rc.plan_cross_substitution(reference, candidate, tag=""))
     assert_well_formed(experiments)
@@ -825,22 +876,22 @@ def test_actual_manifests_load_and_plan(member):
 
 @pytestmark_actual
 def test_actual_reference_and_lane_geometry():
-    reference = rc.load_actual_capture(ACTIVATIONS / REFERENCE_DIR)
+    reference = schema.load_capture(ACTIVATIONS / REFERENCE_DIR)
     assert reference.rows == 1
-    assert reference.request_id(0) == 2026091950
-    assert reference.position(0) == 41
+    assert reference.wave_rows[0]["request_id"] == 2026091950
+    assert reference.wave_rows[0]["absolute_position"] == 41
     assert reference.device_descriptors == (0,)
-    lane0 = rc.load_actual_capture(ACTIVATIONS / CANDIDATE_DIRS[0])
-    lane1 = rc.load_actual_capture(ACTIVATIONS / CANDIDATE_DIRS[1])
+    lane0 = schema.load_capture(ACTIVATIONS / CANDIDATE_DIRS[0])
+    lane1 = schema.load_capture(ACTIVATIONS / CANDIDATE_DIRS[1])
     assert lane0.device_descriptors == (0, 1)
-    assert lane0.request_id(0) == 2026091960
-    assert lane0.request_id(1) == 2026091961
+    assert lane0.wave_rows[0]["request_id"] == 2026091960
+    assert lane0.wave_rows[1]["request_id"] == 2026091961
     assert lane1.device_descriptors == (2, 3)
-    assert lane1.request_id(0) == 2026091962
-    assert lane1.request_id(1) == 2026091963
+    assert lane1.wave_rows[0]["request_id"] == 2026091962
+    assert lane1.wave_rows[1]["request_id"] == 2026091963
     for capture in (reference, lane0, lane1):
         for r in range(capture.rows):
-            assert capture.position(r) == 41
+            assert capture.wave_rows[r]["absolute_position"] == 41
             latent = capture.wave_rows[r]["completed_latent"]
             assert latent["first_token"] == 40
             assert latent["logical_compressed_row"] == 20
@@ -849,7 +900,7 @@ def test_actual_reference_and_lane_geometry():
 
 @pytestmark_actual
 def test_actual_weights_and_frequencies_match_across_sources():
-    captures = [rc.load_actual_capture(ACTIVATIONS / name)
+    captures = [schema.load_capture(ACTIVATIONS / name)
                 for name in (REFERENCE_DIR,) + CANDIDATE_DIRS]
     hashes = rc.assert_weights_compatible(*captures)
     assert set(hashes) == {"wkv", "wgate", "norm"}
@@ -863,9 +914,9 @@ def test_actual_weights_and_frequencies_match_across_sources():
 
 @pytestmark_actual
 def test_actual_d_gates_use_captured_oracles_and_lane_slots_map():
-    reference = rc.load_actual_capture(ACTIVATIONS / REFERENCE_DIR)
-    lane0 = rc.load_actual_capture(ACTIVATIONS / CANDIDATE_DIRS[0])
-    lane1 = rc.load_actual_capture(ACTIVATIONS / CANDIDATE_DIRS[1])
+    reference = schema.load_capture(ACTIVATIONS / REFERENCE_DIR)
+    lane0 = schema.load_capture(ACTIVATIONS / CANDIDATE_DIRS[0])
+    lane1 = schema.load_capture(ACTIVATIONS / CANDIDATE_DIRS[1])
     for candidate, slots in ((lane0, (0, 1)), (lane1, (2, 3))):
         experiments = rc.plan_cross_substitution(reference, candidate, tag="")
         originals = by_name(experiments, "_bundle_cand_originals")
@@ -883,15 +934,25 @@ def test_actual_d_gates_use_captured_oracles_and_lane_slots_map():
 
 @pytestmark_actual
 def test_actual_names_unique_across_both_lanes():
-    reference = rc.load_actual_capture(ACTIVATIONS / REFERENCE_DIR)
-    experiments = []
+    captures = schema.load_captures(ACTIVATIONS)
+    assert len(captures) == 3                       # three manifests
+    assert sorted(c.rows for c in captures) == [1, 2, 2]
+    assert sum(len(c.p41_rows()) for c in captures) == 5   # five p41 rows
+    reference = schema.load_capture(ACTIVATIONS / REFERENCE_DIR)
+    c_experiments, d_experiments = [], []
     for member in CANDIDATE_DIRS:
-        candidate = rc.load_actual_capture(ACTIVATIONS / member)
-        experiments += rc.plan_candidate_geometry(candidate, reference,
-                                                  tag="")
-        experiments += rc.plan_cross_substitution(reference, candidate, tag="")
-    names = [e.name for e in experiments]
+        candidate = schema.load_capture(ACTIVATIONS / member)
+        c_member = rc.plan_candidate_geometry(candidate, reference, tag="")
+        d_member = rc.plan_cross_substitution(reference, candidate, tag="")
+        assert len(c_member) == 7                   # 2 singles + 2 dups + 1 swap + 2 mixed
+        assert len(d_member) == 12                  # 4 per candidate row + 4 bundles
+        c_experiments += c_member
+        d_experiments += d_member
+    assert len(c_experiments) == 14                 # C14 across both candidates
+    assert len(d_experiments) == 24                 # D24 across both candidates
+    names = [e.name for e in c_experiments + d_experiments]
     assert len(names) == len(set(names)) == 38
-    gated = [e for e in experiments if not e.counterfactual]
-    assert len(gated) == 14          # 7 gated D cases (4 singles + 3 bundles) x 2 lanes
+    gated = [e for e in d_experiments if not e.counterfactual]
+    assert len(gated) == 14     # per candidate: 2 rows x 2 originals + 3 bundles
     assert all(e.kind == "D" for e in gated)
+    assert all(e.expected for e in gated)           # D original gates present

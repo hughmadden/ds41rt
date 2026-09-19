@@ -1,12 +1,12 @@
 """Focused CPU tests for structural plan validation.
 
-These cover the positive path (actual-style A/B/P plans validate), the negative
-cases (missing projected->kv read, shape/bytes mismatch, duplicate roles, a
-stage reading a future output, an output clobbering an operand, a missing or
-invalid oracle) and the guarantee that rejection happens before any FakeGPU
-activity.  The old candidate-geometry (C) planner is exercised as the currently
-expected failure: the full CLI must fail clean with an actionable error until
-the replacement planner is integrated.  No torch, GPU or native call is made.
+These cover the positive path (the full actual-style A/B/C/D/P plan validates
+every experiment), the negative cases (missing projected->kv read, shape/bytes
+mismatch, duplicate roles, a stage reading a future output, an output clobbering
+an operand, a missing or invalid oracle) and the guarantee that rejection
+happens before any FakeGPU activity.  The corrected row-case planners now emit
+complete C/D bundles, so the full CLI plan succeeds and the reference-selection
+rule is recorded.  No torch, GPU or native call is made.
 """
 
 from __future__ import annotations
@@ -15,6 +15,7 @@ import copy
 import hashlib
 import json
 import sys
+from collections import Counter
 from pathlib import Path
 
 import pytest
@@ -33,14 +34,20 @@ ACTUAL_CAPTURE = Path(
     "flash-cap16-p2-compressor-diagnostic-01/activations"
 )
 
+# All synthetic captures share one p41 frequency row (as the actual traces
+# do), so family D can combine reference and candidate row bundles.
+SHARED_FREQ_ROW = bytes((i * 31 + 7) & 0xFF for i in range(32 * 2 * 4))
+
 
 def _captures(tmp_path):
     root = tmp_path / "activations"
     root.mkdir()
     fixtures.write_synthetic_capture(root, "first", geometry="single",
-                                     weights_writer=True, seed=1)
+                                     weights_writer=True, seed=1,
+                                     frequency_row=SHARED_FREQ_ROW)
     fixtures.write_synthetic_capture(root, "pair", geometry="pair",
-                                     weights_writer=False, seed=2)
+                                     weights_writer=False, seed=2,
+                                     frequency_row=SHARED_FREQ_ROW)
     return schema.load_captures(root)
 
 
@@ -69,28 +76,26 @@ def _fake_session():
 # Positive: the A/B/P plans validate.
 # ---------------------------------------------------------------------------
 
-def test_actual_style_A_B_P_plans_validate(tmp_path):
+def test_actual_style_plans_validate_every_family(tmp_path):
     planned = experiments.plan_experiments(_captures(tmp_path))
     kinds = {e.kind for e in planned}
-    assert {"A", "B", "P", "C"} <= kinds
+    assert {"A", "B", "P", "C", "D"} <= kinds
+    # Every selected experiment validates before any GPU/native path: the C/D
+    # replacement planners emit complete, structurally valid bundles.
     for experiment in planned:
-        if experiment.kind in ("A", "B", "P"):
-            runner.validate_experiment(experiment)  # re-exported in runner
+        runner.validate_experiment(experiment)  # re-exported in runner
 
 
 @pytest.mark.skipif(not ACTUAL_CAPTURE.is_dir(),
                     reason="actual compressor capture not present")
-def test_actual_A_B_P_plan_validates():
+def test_actual_plan_validates_every_experiment():
     captures = schema.load_captures(ACTUAL_CAPTURE)
     planned = experiments.plan_experiments(captures)
     for experiment in planned:
-        if experiment.kind in ("A", "B", "P"):
-            runner.validate_experiment(experiment)
-    candidate = [e for e in planned if e.kind == "C"]
-    assert candidate
-    for experiment in candidate:
-        with pytest.raises(ValidationError):
-            runner.validate_experiment(experiment)
+        runner.validate_experiment(experiment)
+    kinds = Counter(e.kind for e in planned)
+    assert kinds["C"] == 14
+    assert kinds["D"] == 24
 
 
 # ---------------------------------------------------------------------------
@@ -220,7 +225,7 @@ def test_invalid_plan_rejected_before_any_fake_gpu_activity(tmp_path):
 
 
 # ---------------------------------------------------------------------------
-# CLI: the old candidate-geometry plan fails clean; a C-free plan succeeds.
+# CLI: the full plan validates every experiment, and an A/B/P-only root works.
 # ---------------------------------------------------------------------------
 
 def _native_pin(tmp_path):
@@ -229,26 +234,32 @@ def _native_pin(tmp_path):
     return native, hashlib.sha256(native.read_bytes()).hexdigest()
 
 
-def test_cli_full_plan_fails_clean_on_old_candidate_geometry(tmp_path, capsys):
+def test_cli_full_plan_validates_every_experiment(tmp_path, capsys):
     root = tmp_path / "activations"
     root.mkdir()
     fixtures.write_synthetic_capture(root, "first", geometry="single",
-                                     weights_writer=True, seed=1)
+                                     weights_writer=True, seed=1,
+                                     frequency_row=SHARED_FREQ_ROW)
     fixtures.write_synthetic_capture(root, "pair", geometry="pair",
-                                     weights_writer=False, seed=2)
+                                     weights_writer=False, seed=2,
+                                     frequency_row=SHARED_FREQ_ROW)
     native, sha = _native_pin(tmp_path)
     output = tmp_path / "plan-out"
     rc = cli.main(["--activations", str(root), "--native-library", str(native),
                    "--native-sha256", sha, "--output", str(output)])
-    assert rc == 1
-    error = json.loads(capsys.readouterr().err)
-    assert error["ok"] is False
-    # Actionable structural error naming the rejected experiment; the old C
-    # planner trips either the projected->kv read or an operand byte mismatch.
-    assert error["error"].startswith("experiment ")
-    assert ("produced by an earlier stage" in error["error"]
-            or "bytes" in error["error"])
-    assert not output.exists()
+    assert rc == 0
+    summary = json.loads(capsys.readouterr().out)
+    assert summary["ok"] is True
+    assert summary["reference_selection"]["rule"] == "unique_single_row"
+    plan = json.loads((output / "plan.json").read_text())
+    # Every planned experiment (C/D included) passed validation before the
+    # plan was written; no experiment is emitted unvalidated.
+    assert plan["reference_selection"] == {
+        "rule": "unique_single_row", "refname": "first", "rows": 1,
+    }
+    kinds = Counter(e["kind"] for e in plan["experiments"])
+    assert kinds["C"] == 7
+    assert kinds["D"] == 12
 
 
 def test_cli_abp_only_plan_succeeds(tmp_path, capsys):
@@ -263,4 +274,5 @@ def test_cli_abp_only_plan_succeeds(tmp_path, capsys):
     assert rc == 0
     summary = json.loads(capsys.readouterr().out)
     assert summary["ok"] is True
+    assert summary["reference_selection"]["rule"] == "unique_single_row"
     assert (output / "plan.json").is_file()

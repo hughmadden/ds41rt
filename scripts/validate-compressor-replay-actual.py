@@ -60,6 +60,7 @@ def build_report(activations_root: Path) -> dict:
             for c in captures
         ],
         "p41_row_total": sum(len(c.p41_rows()) for c in captures),
+        "reference_selection": experiments.reference_selection(captures),
         "weights": {
             "directory": captures[0].weights_provenance.get("weights_dir")
             if captures else None,

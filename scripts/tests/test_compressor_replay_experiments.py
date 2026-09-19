@@ -10,7 +10,10 @@ from __future__ import annotations
 
 import hashlib
 import sys
+import types
 from pathlib import Path
+
+import pytest
 
 SCRIPT_DIR = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(SCRIPT_DIR))
@@ -22,14 +25,20 @@ from compressor_replay import experiments, fixtures, runner, schema  # noqa: E40
 
 ROW_BYTES = schema.ROW_BYTES["input"]
 
+# One shared p41 frequency row across every synthetic capture (as the actual
+# traces do), so family D can combine reference and candidate bundles.
+SHARED_FREQ_ROW = bytes((i * 31 + 7) & 0xFF for i in range(32 * 2 * 4))
+
 
 def _captures(tmp_path):
     root = tmp_path / "activations"
     root.mkdir()
     fixtures.write_synthetic_capture(root, "first", geometry="single",
-                                     weights_writer=True, seed=1)
+                                     weights_writer=True, seed=1,
+                                     frequency_row=SHARED_FREQ_ROW)
     fixtures.write_synthetic_capture(root, "pair", geometry="pair",
-                                     weights_writer=False, seed=2)
+                                     weights_writer=False, seed=2,
+                                     frequency_row=SHARED_FREQ_ROW)
     return schema.load_captures(root)
 
 
@@ -58,17 +67,22 @@ def test_counterfactuals_have_empty_oracles_and_distinct_input_hashes(tmp_path):
     assert baseline_input is not None
     counterfactuals = [e for e in planned if e.counterfactual]
     assert counterfactuals
-    seen = set()
     for experiment in counterfactuals:
         assert experiment.expected == {}
         assert experiment.counterfactual is True
+    # Family D counterfactuals substitute already-projected FP32 operands, so
+    # they carry no "input" role; the projection-only B/C/P counterfactuals
+    # (and mutation/padding variants) must each have a distinct input hash.
+    input_counterfactuals = [e for e in counterfactuals if _input_sha(e)]
+    assert input_counterfactuals
+    seen = set()
+    for experiment in input_counterfactuals:
         digest = _input_sha(experiment)
-        assert digest is not None, experiment.name
         assert digest != baseline_input, experiment.name
         seen.add(digest)
     # Mutated/regrouped/padded inputs are explicitly different from each other
     # as well as from the baseline.
-    assert len(seen) == len(counterfactuals)
+    assert len(seen) == len(input_counterfactuals)
     # No counterfactual produces an oracle or gates the baseline.
     assert all(not e.expected for e in counterfactuals)
 
@@ -183,3 +197,73 @@ def test_padded_project_executes_through_real_executor(tmp_path):
     assert record["executed"] is True
     assert record["status"] == "executed"  # counterfactual, not a numeric gate
     assert len(list((tmp_path / "padded").glob("*.bin"))) == 6
+
+
+# ---------------------------------------------------------------------------
+# Reference selection (explicit name, unique one-row fallback, ambiguity).
+# ---------------------------------------------------------------------------
+
+def _named_capture(name, rows):
+    return types.SimpleNamespace(directory=Path(name), rows=rows)
+
+
+def test_select_reference_prefers_unique_explicit_name():
+    captures = [
+        _named_capture("lane0-batch20-Full-1rows", 1),
+        _named_capture("other-reference-2rows", 2),
+        _named_capture("lane1-batch82-Full-2rows", 2),
+    ]
+    reference = experiments.select_reference(captures)
+    assert reference.directory.name == "other-reference-2rows"
+    assert experiments.reference_selection(captures) == {
+        "rule": "explicit_name", "refname": "other-reference-2rows", "rows": 2,
+    }
+
+
+def test_select_reference_falls_back_to_unique_single_row():
+    captures = [
+        _named_capture("lane0-batch20-Full-1rows", 1),
+        _named_capture("lane0-batch81-Full-2rows", 2),
+        _named_capture("lane1-batch82-Full-2rows", 2),
+    ]
+    assert experiments.reference_selection(captures) == {
+        "rule": "unique_single_row",
+        "refname": "lane0-batch20-Full-1rows",
+        "rows": 1,
+    }
+
+
+def test_select_reference_rejects_ambiguous_single_rows():
+    captures = [_named_capture("a-1rows", 1), _named_capture("b-1rows", 1)]
+    with pytest.raises(ValueError, match="ambiguous reference"):
+        experiments.select_reference(captures)
+    with pytest.raises(ValueError, match="ambiguous reference"):
+        experiments.reference_selection(captures)
+
+
+def test_select_reference_non_unique_name_falls_back_to_single_row():
+    captures = [_named_capture("reference-a", 2),
+                _named_capture("reference-b", 2),
+                _named_capture("lane0-batch20-Full-1rows", 1)]
+    assert experiments.reference_selection(captures) == {
+        "rule": "unique_single_row",
+        "refname": "lane0-batch20-Full-1rows",
+        "rows": 1,
+    }
+
+
+def test_select_reference_rejects_ambiguous_name_and_single_row():
+    captures = [_named_capture("reference-a", 2),
+                _named_capture("reference-b", 2),
+                _named_capture("one-1rows", 1),
+                _named_capture("two-1rows", 1)]
+    with pytest.raises(ValueError, match="ambiguous reference"):
+        experiments.select_reference(captures)
+
+
+def test_select_reference_none_without_single_row_or_name():
+    captures = [_named_capture("lane0-batch81-Full-2rows", 2)]
+    assert experiments.select_reference(captures) is None
+    assert experiments.reference_selection(captures) == {
+        "rule": "none", "refname": None, "rows": None,
+    }

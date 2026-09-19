@@ -152,6 +152,7 @@ def validate_and_plan(args) -> tuple:
             }
             for c in captures
         ],
+        "reference_selection": exp.reference_selection(captures),
         "experiments": [
             {
                 "name": e.name,
@@ -210,6 +211,7 @@ def main(argv=None) -> int:
             "output": str(output),
             "captures": len(captures),
             "experiments": len(planned),
+            "reference_selection": plan["reference_selection"],
             "counterfactual_experiments": sum(1 for e in planned
                                               if e.counterfactual),
             "execute_command": plan["execute_command"],
