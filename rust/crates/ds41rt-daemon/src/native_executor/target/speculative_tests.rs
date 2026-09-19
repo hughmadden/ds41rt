@@ -350,3 +350,16 @@ fn retained_window_seed_and_append_rules_cover_final_decoder_replay() -> Result<
     assert!(append_end(Some(u64::MAX), u64::MAX, 1).is_err());
     Ok(())
 }
+
+#[test]
+fn speculative_wire_kind_matches_retained_native_verification_even_for_k0() -> Result<()> {
+    let mut f = draft_fixture()?;
+    f.state.borrow_mut().ready[0] = true;
+    for rows in [1, 4] {
+        let mut input = proposal(f.requests[0]); input.remaining_output_tokens = rows;
+        let proposed = ready(f.lanes[0].submit_speculative(input))?;
+        assert_eq!(f.lanes[0].job.as_ref().unwrap().inputs[0].kind, SourceKind::MtpVerify);
+        f.lanes[0].cancel(proposed.ticket)?;
+    }
+    Ok(())
+}

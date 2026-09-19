@@ -32,12 +32,16 @@ pub unsafe trait SpeculativeDriver: TargetDriver {
     fn validate_proposal(&self, input: &SpeculativeInput) -> Result<()>;
     fn poll_proposal(&mut self, input: &SpeculativeInput) -> Result<Option<DraftTokens>>;
     fn cancel_proposal(&mut self) -> Result<()>;
+    fn poll_proposal_batch(&mut self, inputs: &[SpeculativeInput]) -> Result<Option<DraftBatch>> {
+        ensure!(inputs.len() == 1, "driver does not support grouped drafts");
+        Ok(self.poll_proposal(&inputs[0])?.map(|p| DraftBatch { tokens: vec![p.tokens], draft_us: p.draft_us }))
+    }
 }
-struct ProposalGuard<'a, D: SpeculativeDriver> {
-    driver: &'a mut D,
-    active: Rc<Active>,
-    ticket: Ticket,
-    armed: bool,
+pub(super) struct ProposalGuard<'a, D: SpeculativeDriver> {
+    pub(super) driver: &'a mut D,
+    pub(super) active: Rc<Active>,
+    pub(super) ticket: Ticket,
+    pub(super) armed: bool,
 }
 impl<D: SpeculativeDriver> Drop for ProposalGuard<'_, D> {
     fn drop(&mut self) {
@@ -92,7 +96,7 @@ impl<D: SpeculativeDriver> TargetContext<D> {
             request: input.request,
             tokens: proposed.tokens.clone(),
             selected,
-            kind: SourceKind::Decode,
+            kind: SourceKind::MtpVerify,
             placement: input.placement,
         };
         target.validate(self.capacity, self.head_capacity)?;
@@ -102,7 +106,8 @@ impl<D: SpeculativeDriver> TargetContext<D> {
         drop(guard);
         self.job = Some(Job {
             ticket,
-            input: target,
+            inputs: vec![target],
+            grouped: false,
             batch,
             phase: Phase::Prepared,
         });

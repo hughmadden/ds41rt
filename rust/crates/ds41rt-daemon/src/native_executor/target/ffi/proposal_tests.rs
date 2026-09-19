@@ -17,7 +17,7 @@ fn propose(f: &Fixture, lane: usize, request: &Value) -> u64 {
         "expected_committed_end":4,"anchor":10,"remaining_output_tokens":4,"placement":1}),
     )
 }
-fn wait_readers(f: &Fixture, lane: usize) {
+pub(super) fn wait_readers(f: &Fixture, lane: usize) {
     let deadline = Instant::now() + Duration::from_secs(5);
     while f.control.proposal_readers[lane].load(Ordering::SeqCst) != 3 {
         assert!(

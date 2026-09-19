@@ -85,6 +85,42 @@ extern "C" {
  * logical zero if enabled but unseeded. Otherwise it must match committed_end.
  * No native sampler replaces vLLM's target sampling/rejection policy.
  *
+ * Additive grouped decode commands (singleton commands remain unchanged):
+ * submit_batch {lane,placement,members:[{request,expected_committed_end,
+ *                tokens:[u32],selected:[usize],kind:"decode"}]}
+ * submit_speculative_batch {lane,placement,members:[{request,
+ *                expected_committed_end,anchor,remaining_output_tokens}]}
+ * Both support 1..8 unique requests in the given canonical order. Full-target
+ * grouping is decode only; encoder-stream/prefill use singleton commands. Each
+ * group calls ONE retained native TargetPass; member rows are concatenated.
+ * Aggregate input rows <= native capacity_rows; aggregate selected rows <=48.
+ * Grouped proposals allow different envelopes including K0 (remaining=1).
+ * Prepared reply {state:"prepared",ticket,bank,draft_us,members:[{request,
+ * committed_end,draft_committed_end,tokens,selected,input_offset,output_offset}]}.
+ * selected is local to each member; offsets map concatenated input rows and
+ * compact selected output rows. Descriptor.selected adds input_offset; descriptor
+ * positions use that member's actual committed_end plus its local selected row.
+ * ticket remains {request:first_member,lane,id}; this is opaque identity of the
+ * WHOLE group, not permission to release or mutate another manifest member.
+ * All members stay claimed through execution, output consumers and publication.
+ * execute/poll/acquire_logits/release_logits/cancel operate on that whole ticket.
+ * There is one native logits borrow and one CUDA consumer fence for the group.
+ * commit_batch {ticket,accepted:[u32]} is mandatory even for one-member groups.
+ * The vector must match the canonical member order/count; each entry is an input
+ * prefix 0..member.tokens.length. Invalid vectors preserve the ready result.
+ * Reply {state:"committed",ticket,bank,members:[{request,committed_end,
+ * draft_committed_end}]}. Native lane-local queued target/draft publication drains
+ * before this ACK; peer lane/controller continue while this commit is pending.
+ * Group cancel reply {state:"cancelled",ticket,bank,members:[{request,
+ * revoked:false,committed_end,draft_committed_end}]} retains every prior prefix.
+ * Publication failure is FAILED, poisons the owner and drains/revokes the whole
+ * group (including zero-accepted members); it never reports partial success.
+ * cancel_proposal also accepts a grouped proposal command. Both race ACKs use
+ * members:[{request,committed_end,draft_committed_end}] instead of singleton
+ * request/frontier fields; proposal_completed includes the recovered ticket.
+ * The original command reply must still be collected. No grouped operation
+ * creates another physical cache bank or changes whole-step capacity admission.
+ *
  * execute {ticket}, poll {ticket}, acquire_logits {ticket}
  * release_logits {ticket,lease:u64,consumer_stream:"0x..."}
  * commit {ticket,accepted:u32}, cancel {ticket}, release {request}, shutdown {}

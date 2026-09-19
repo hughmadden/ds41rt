@@ -17,6 +17,7 @@ mod actor;
 mod native;
 mod stream;
 mod proposal;
+mod batch;
 
 const OK: i32 = 0;
 const INVALID: i32 = 1;
@@ -96,6 +97,23 @@ struct Append {
     tokens: u32,
 }
 #[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct BatchInput {
+    request: RequestHandle,
+    expected_committed_end: u64,
+    tokens: Vec<u32>,
+    selected: Vec<usize>,
+    kind: Kind,
+}
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct DraftInput {
+    request: RequestHandle,
+    expected_committed_end: u64,
+    anchor: u32,
+    remaining_output_tokens: usize,
+}
+#[derive(Deserialize)]
 #[serde(tag = "op", rename_all = "snake_case", deny_unknown_fields)]
 enum Command {
     Info {
@@ -122,6 +140,9 @@ enum Command {
         remaining_output_tokens: usize,
         placement: u64,
     },
+    SubmitBatch { lane: usize, placement: u64, members: Vec<BatchInput> },
+    SubmitSpeculativeBatch { lane: usize, placement: u64, members: Vec<DraftInput> },
+    CommitBatch { ticket: Ticket, accepted: Vec<u32> },
     CancelProposal { command_id: u64 },
     Execute {
         ticket: Ticket,
@@ -152,11 +173,13 @@ enum Command {
 impl Command {
     fn lane(&self) -> Option<usize> {
         match self {
-            Self::Submit { lane, .. } | Self::SubmitSpeculative { lane, .. } => Some(*lane),
+            Self::Submit { lane, .. } | Self::SubmitSpeculative { lane, .. }
+            | Self::SubmitBatch { lane, .. } | Self::SubmitSpeculativeBatch { lane, .. } => Some(*lane),
             Self::Execute { ticket }
             | Self::Poll { ticket }
             | Self::AcquireLogits { ticket }
             | Self::ReleaseLogits { ticket, .. }
+            | Self::CommitBatch { ticket, .. }
             | Self::Commit { ticket, .. }
             | Self::Cancel { ticket } => Some(ticket.lane),
             _ => None,
@@ -168,6 +191,7 @@ impl Command {
             | Self::Poll { ticket }
             | Self::AcquireLogits { ticket }
             | Self::ReleaseLogits { ticket, .. }
+            | Self::CommitBatch { ticket, .. }
             | Self::Commit { ticket, .. }
             | Self::Cancel { ticket } => Some(*ticket),
             _ => None,
@@ -182,6 +206,8 @@ struct Message {
 struct Slot {
     ticket: Option<Ticket>,
     request: Option<RequestHandle>,
+    members: Vec<RequestHandle>,
+    grouped: bool,
     phase: &'static str,
     error: Option<String>,
     pending: bool,
@@ -238,7 +264,11 @@ impl Client {
         let proposal_command = if previous.ticket == Some(ticket) || previous.phase == "proposing" {
             previous.proposal_command
         } else { None };
+        let preserve = previous.ticket == Some(ticket) || previous.pending;
+        let members = if preserve { previous.members.clone() } else { vec![ticket.request] };
+        let grouped = preserve && previous.grouped;
         shared.slots[ticket.lane] = Slot {
+            members, grouped,
             ticket: Some(ticket),
             request: Some(ticket.request),
             phase,

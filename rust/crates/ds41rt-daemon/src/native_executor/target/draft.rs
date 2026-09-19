@@ -16,7 +16,14 @@ pub(super) trait NativeDraft<'a> {
         id: u64,
         input: &SpeculativeInput,
     ) -> Result<Option<DraftTokens>>;
+    fn poll_batch(&mut self, lane: usize, inputs: &[(u64, SpeculativeInput)]) -> Result<Option<DraftBatch>>;
     fn cancel(&mut self, lane: usize) -> Result<()>;
+    fn begin_commit(&mut self, lane: usize, pass: &TargetPass<'_, 'a>, requests: &Requests<'a>,
+        batch: &RequestBatch, accepted: &[u32]) -> Result<()>;
+    fn poll_commit(&self, lane: usize) -> Result<bool>;
+    fn finish_commit(&mut self, lane: usize, pass: &mut TargetPass<'_, 'a>, requests: &mut Requests<'a>,
+        batch: &mut RequestBatch, accepted: &[u32]) -> Result<()>;
+    fn abort_commit(&mut self, lane: usize, requests: &mut Requests<'a>, batch: &mut RequestBatch) -> Result<()>;
     fn commit(
         &mut self,
         pass: &mut TargetPass<'_, 'a>,
@@ -48,33 +55,53 @@ impl<'a> NativeDraft<'a> for DraftRuntime<'_, 'a> {
         id: u64,
         input: &SpeculativeInput,
     ) -> Result<Option<DraftTokens>> {
-        let Some((mut proposals, draft_us)) = self.poll_propose(
-            lane,
-            &[(
-                id,
-                input.anchor,
-                input.expected_committed_end,
-                input.remaining_output_tokens,
-            )],
-        )?
-        else {
-            return Ok(None);
-        };
-        ensure!(proposals.len() == 1, "native draft result count differs");
-        let mut tokens = proposals.remove(0);
-        ensure!(!tokens.is_empty(), "native draft omitted anchor");
-        let maximum = self.confidence_prefix(id, tokens.len() - 1)?;
-        tokens.truncate(maximum + 1);
-        if self.adaptive_enabled() && maximum > 0 {
-            if let Some(lengths) = self.select_prefixes(&[(id, lane, maximum)], draft_us)? {
-                ensure!(
-                    lengths.len() == 1 && lengths[0] <= maximum,
-                    "native adaptive result differs"
-                );
-                tokens.truncate(lengths[0] + 1);
+        Ok(NativeDraft::poll_batch(self, lane, &[(id, *input)])?.map(|mut batch|
+            DraftTokens { tokens: batch.tokens.remove(0), draft_us: batch.draft_us }))
+    }
+    fn poll_batch(&mut self, lane: usize, inputs: &[(u64, SpeculativeInput)]) -> Result<Option<DraftBatch>> {
+        let seeds = inputs.iter().map(|(id, input)| (*id, input.anchor, input.expected_committed_end,
+            input.remaining_output_tokens)).collect::<Vec<_>>();
+        let Some((mut tokens, draft_us)) = self.poll_propose(lane, &seeds)? else { return Ok(None); };
+        ensure!(tokens.len() == inputs.len(), "native draft result count differs");
+        let candidates = inputs.iter().zip(&mut tokens).map(|((id, _), tokens)| {
+            ensure!(!tokens.is_empty(), "native draft omitted anchor");
+            let maximum = self.confidence_prefix(*id, tokens.len() - 1)?;
+            tokens.truncate(maximum + 1); Ok((*id, lane, maximum))
+        }).collect::<Result<Vec<_>>>()?;
+        if self.adaptive_enabled() && candidates.iter().any(|(_, _, n)| *n > 0) {
+            if let Some(lengths) = self.select_prefixes(&candidates, draft_us)? {
+                ensure!(lengths.len() == tokens.len(), "native adaptive member count differs");
+                for (tokens, length) in tokens.iter_mut().zip(lengths) {
+                    ensure!(length < tokens.len(), "native adaptive result exceeds proposal");
+                    tokens.truncate(length + 1);
+                }
             }
         }
-        Ok(Some(DraftTokens { tokens, draft_us }))
+        Ok(Some(DraftBatch { tokens, draft_us }))
+    }
+    fn begin_commit(&mut self, lane: usize, pass: &TargetPass<'_, 'a>, requests: &Requests<'a>,
+        batch: &RequestBatch, accepted: &[u32]) -> Result<()> {
+        self.begin_queued_commit(lane, pass, requests, batch, accepted)
+    }
+    fn poll_commit(&self, lane: usize) -> Result<bool> { self.poll_queued_commit(lane) }
+    fn finish_commit(&mut self, lane: usize, pass: &mut TargetPass<'_, 'a>, requests: &mut Requests<'a>,
+        batch: &mut RequestBatch, accepted: &[u32]) -> Result<()> {
+        let ids = batch.cache()?.request_ids().to_vec();
+        let rows = batch.cache()?.window_chunks(0)?;
+        // Observe while the retained queued transaction still owns its member
+        // IDs. Any policy failure can then drain/revoke the whole target/draft
+        // group; a poisoned owner cannot reuse this uncommitted policy history.
+        if self.capture_routes() {
+            let mut offset = 0;
+            for ((id, rows), &accepted) in ids.into_iter().zip(rows).zip(accepted) {
+                self.observe_accepted_routes(id, offset, accepted as usize, pass.captured_routes())?;
+                offset += rows.tokens as usize;
+            }
+        }
+        self.finish_queued_commit(lane, pass, requests, batch, accepted)
+    }
+    fn abort_commit(&mut self, lane: usize, requests: &mut Requests<'a>, batch: &mut RequestBatch) -> Result<()> {
+        self.abort_queued_commit(lane, requests, batch)
     }
     fn cancel(&mut self, lane: usize) -> Result<()> {
         self.cancel_propose(lane)
@@ -136,6 +163,15 @@ unsafe impl SpeculativeDriver for NativeDriver<'_, '_, '_> {
             .as_deref_mut()
             .context("native dSpark disabled")?
             .poll(self.lane, id, &bounded)
+    }
+    fn poll_proposal_batch(&mut self, inputs: &[SpeculativeInput]) -> Result<Option<DraftBatch>> {
+        let bounded = inputs.iter().map(|input| {
+            let id = self.requests.borrow().cache().request_id(input.request)?;
+            let mut input = *input;
+            input.remaining_output_tokens = input.remaining_output_tokens.min((self.max_context - input.expected_committed_end) as usize);
+            Ok((id, input))
+        }).collect::<Result<Vec<_>>>()?;
+        self.draft.borrow_mut().as_deref_mut().context("native dSpark disabled")?.poll_batch(self.lane, &bounded)
     }
     fn cancel_proposal(&mut self) -> Result<()> {
         self.draft

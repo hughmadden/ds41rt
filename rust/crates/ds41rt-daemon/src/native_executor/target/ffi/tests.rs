@@ -1,7 +1,7 @@
 //! CPU ABI contract tests use the production channel, registry and lane actors.
 use super::*;
-use crate::v41_compressor::source_cache::{SourcePages, SourcePrefix};
-use crate::v41_dspark_cache::access::{SlotAccess, ReadReservation};
+use crate::v41_compressor::source_cache::{SourcePages, SourcePrefix, IndexPlan};
+use crate::v41_dspark_cache::access::{SlotAccess, ReadReservation, WriteReservation};
 use std::{
     sync::atomic::{AtomicBool, AtomicUsize},
     time::{Duration, Instant},
@@ -18,6 +18,11 @@ struct Control {
     proposal_ready: [AtomicBool; 2],
     proposal_readers: [AtomicUsize; 2],
     proposal_drains: [AtomicUsize; 2],
+    passes: [AtomicUsize; 2],
+    grouped_members: [AtomicUsize; 2],
+    commit_ready: [AtomicBool; 2],
+    commit_started: [AtomicBool; 2],
+    fail_commit: [AtomicBool; 2],
 }
 impl Control {
     fn new() -> Self {
@@ -31,14 +36,17 @@ impl Control {
             stream_stage: AtomicUsize::new(0),
             proposal_ready: std::array::from_fn(|_| AtomicBool::new(true)),
             proposal_readers: Default::default(), proposal_drains: Default::default(),
+            passes: Default::default(), grouped_members: Default::default(),
+            commit_ready: std::array::from_fn(|_| AtomicBool::new(true)),
+            commit_started: Default::default(), fail_commit: Default::default(),
         }
     }
 }
 struct Physical {
     owner: u64,
     pages: [SourcePages; 4],
-    ends: [Option<u64>; 2],
-    generations: [u64; 2],
+    ends: [Option<u64>; 4],
+    generations: [u64; 4],
 }
 #[derive(Clone)]
 struct FakeBank {
@@ -55,7 +63,7 @@ impl actor::Bank for FakeBank {
     }
     fn admit(&self, slot: usize, _id: u64) -> Result<RequestHandle> {
         let mut p = self.physical.borrow_mut();
-        ensure!(slot < 2 && p.ends[slot].is_none(), "slot busy");
+        ensure!(slot < 4 && p.ends[slot].is_none(), "slot busy");
         p.generations[slot] += 1;
         p.ends[slot] = Some(0);
         Ok(RequestHandle::new(p.owner, slot, p.generations[slot]))
@@ -118,8 +126,11 @@ impl actor::Bank for FakeBank {
         Ok(())
     }
 }
+struct FakePublication { plans: Vec<IndexPlan>, writers: Vec<WriteReservation> }
 struct FakeBatch {
     request: RequestHandle,
+    members: Vec<RequestHandle>,
+    publication: Option<FakePublication>,
     selected: Vec<usize>,
     positions: Vec<u64>,
     reads: Vec<SourcePrefix>,
@@ -156,13 +167,14 @@ unsafe impl TargetDriver for Driver {
             })
             .collect::<Result<Vec<_>>>()?;
         Ok(FakeBatch {
-            request: input.request,
+            request: input.request, members: vec![input.request], publication: None,
             selected: input.selected.clone(),
             positions: input.selected.iter().map(|&r| end + r as u64).collect(),
             reads,
         })
     }
     async fn execute(&mut self, _batch: &mut FakeBatch, input: &TargetInput) -> Result<()> {
+        self.control.passes[self.lane].fetch_add(1, Ordering::SeqCst);
         while !self.control.execute[self.lane].load(Ordering::SeqCst) {
             tokio::task::yield_now().await;
         }
@@ -206,7 +218,73 @@ unsafe impl TargetDriver for Driver {
         p.ends[slot] = Some(end);
         Ok(end)
     }
+    fn prepare_batch(&mut self, inputs: &[TargetInput]) -> Result<FakeBatch> {
+        let mut batch = self.prepare(&inputs[0])?;
+        let mut offset = inputs[0].tokens.len();
+        for input in &inputs[1..] {
+            let member = self.prepare(input)?;
+            batch.members.push(input.request);
+            batch.selected.extend(member.selected.iter().map(|i| offset + i));
+            batch.positions.extend(member.positions); batch.reads.extend(member.reads);
+            offset += input.tokens.len();
+        }
+        Ok(batch)
+    }
+    async fn execute_batch(&mut self, _batch: &mut FakeBatch, inputs: &[TargetInput]) -> Result<()> {
+        self.control.passes[self.lane].fetch_add(1, Ordering::SeqCst);
+        self.control.grouped_members[self.lane].store(inputs.len(), Ordering::SeqCst);
+        while !self.control.execute[self.lane].load(Ordering::SeqCst) { tokio::task::yield_now().await; }
+        ensure!(!self.control.fail[self.lane].load(Ordering::SeqCst), "controlled native execution failure");
+        self.output = inputs.iter().flat_map(|i| i.selected.iter().flat_map(|&r|
+            std::iter::repeat_n(i.tokens[r] as f32, 129280))).collect();
+        Ok(())
+    }
+    async fn commit_batch(&mut self, batch: &mut FakeBatch, accepted: &[u32]) -> Result<Vec<u64>> {
+        batch.reads.clear();
+        let ends = batch.members.iter().zip(accepted).map(|(&r, &n)|
+            actor::Bank::end(&self.bank, r).map(|end| end + n as u64)).collect::<Result<Vec<_>>>()?;
+        // The actual retained reservation algorithms own all group destinations
+        // and window writers across the controlled device completion yield.
+        let plans = {
+            let p = self.bank.physical.borrow();
+            (0..4).map(|s| {
+                let work = batch.members.iter().zip(&ends).map(|(r, end)| Ok((r.slot(),
+                    p.pages[s].committed_rows(r.slot())?, *end as usize / if s == 3 { 1 } else { 2 })))
+                    .collect::<Result<Vec<_>>>()?;
+                p.pages[s].reserve(&work)
+            }).collect::<Result<Vec<_>>>()?
+        };
+        let mask = std::array::from_fn(|i| batch.members.iter().zip(accepted).any(|(r, &n)| r.slot() == i && n > 0));
+        let writes = self.bank.draft_access.iter().map(|a| a.reserve_write(mask)).collect::<Result<Vec<_>>>()?;
+        batch.publication = Some(FakePublication { plans, writers: writes });
+        self.control.commit_started[self.lane].store(true, Ordering::SeqCst);
+        while !self.control.commit_ready[self.lane].load(Ordering::SeqCst) { tokio::task::yield_now().await; }
+        if self.control.fail_commit[self.lane].load(Ordering::SeqCst) {
+            drop(batch.publication.take());
+            let mut p = self.bank.physical.borrow_mut();
+            for request in &batch.members {
+                for pages in &mut p.pages { pages.release(request.slot())?; }
+                p.ends[request.slot()] = None;
+            }
+            anyhow::bail!("controlled joint publication failure: all batch admissions revoked");
+        }
+        let pending = batch.publication.take().unwrap();
+        let mut p = self.bank.physical.borrow_mut();
+        for (s, plan) in pending.plans.into_iter().enumerate() { p.pages[s].apply(plan); }
+        for (&request, &end) in batch.members.iter().zip(&ends) { p.ends[request.slot()] = Some(end); }
+        drop(pending.writers); Ok(ends)
+    }
     fn drain(&mut self, batch: &mut FakeBatch) -> Result<()> {
+        if batch.publication.is_some() {
+            // Fake device synchronization completes here. Only after that may
+            // the real page/window write reservations and admissions be freed.
+            drop(batch.publication.take());
+            let mut p = self.bank.physical.borrow_mut();
+            for request in &batch.members {
+                for pages in &mut p.pages { pages.release(request.slot())?; }
+                p.ends[request.slot()] = None;
+            }
+        }
         batch.reads.clear();
         self.output.clear();
         self.control.drains[self.lane].fetch_add(1, Ordering::SeqCst);
@@ -230,6 +308,17 @@ unsafe impl SpeculativeDriver for Driver {
         self.control.proposal_readers[self.lane].store(0, Ordering::SeqCst);
         Ok(Some(DraftTokens { tokens: (0..input.remaining_output_tokens.min(4))
             .map(|i|input.anchor + i as u32).collect(), draft_us: 11 }))
+    }
+    fn poll_proposal_batch(&mut self, inputs: &[SpeculativeInput]) -> Result<Option<DraftBatch>> {
+        if self.draft_readers.is_none() {
+            let mask = std::array::from_fn(|i| inputs.iter().any(|input| input.request.slot() == i));
+            self.draft_readers = Some(self.bank.draft_access.iter().map(|a| a.reserve(mask)).collect::<Result<Vec<_>>>()?);
+            self.control.proposal_readers[self.lane].store(3, Ordering::SeqCst);
+        }
+        if !self.control.proposal_ready[self.lane].load(Ordering::SeqCst) { return Ok(None); }
+        self.draft_readers = None; self.control.proposal_readers[self.lane].store(0, Ordering::SeqCst);
+        Ok(Some(DraftBatch { tokens: inputs.iter().map(|input| (0..input.remaining_output_tokens.min(4))
+            .map(|i| input.anchor + i as u32).collect()).collect(), draft_us: 11 }))
     }
     fn cancel_proposal(&mut self) -> Result<()> {
         self.draft_readers = None;
@@ -256,7 +345,8 @@ struct Fixture {
     client: Arc<Client>,
     control: Arc<Control>,
 }
-fn fixture() -> Fixture {
+fn fixture() -> Fixture { fixture_with_head(4) }
+fn fixture_with_head(head_capacity: usize) -> Fixture {
     static OWNER: AtomicU64 = AtomicU64::new(1000);
     let owner = OWNER.fetch_add(1, Ordering::SeqCst);
     let (client, mut receive) = Client::pair();
@@ -268,9 +358,9 @@ fn fixture() -> Fixture {
             let bank = FakeBank {
                 physical: Rc::new(RefCell::new(Physical {
                     owner,
-                    pages: std::array::from_fn(|_| SourcePages::new(8, 2).unwrap()),
-                    ends: [None; 2],
-                    generations: [0; 2],
+                    pages: std::array::from_fn(|_| SourcePages::new(8, 4).unwrap()),
+                    ends: [None; 4],
+                    generations: [0; 4],
                 })),
                 active: active.clone(),
                 draft_access: Rc::new(std::array::from_fn(|_| SlotAccess::default())),
@@ -286,7 +376,7 @@ fn fixture() -> Fixture {
                     active.clone(),
                     lane,
                     16,
-                    4,
+                    head_capacity,
                 )
             });
             let mut fences = std::array::from_fn(|lane| FakeFence {
@@ -1078,3 +1168,6 @@ fn invalid_stream_input_preserves_fresh_admission_and_normal_mode_reentry() {
 
 #[path = "proposal_tests.rs"]
 mod proposal_tests;
+
+#[path = "batch_tests.rs"]
+mod batch_tests;

@@ -44,20 +44,26 @@ pub(super) fn reserve(client: &Client, message: &Message) -> Api<usize> {
     if slot.pending {
         return Err(fail(BUSY, "lane command pending"));
     }
-    if let Command::Submit { request, .. } | Command::SubmitSpeculative { request, .. } = &message.command {
-        if active(slot)
-            || shared
-                .slots
-                .iter()
-                .any(|s| active(s) && s.request == Some(*request))
-        {
+    let submissions = match &message.command {
+        Command::Submit { request, .. } | Command::SubmitSpeculative { request, .. } => Some(vec![*request]),
+        Command::SubmitBatch { members, .. } => Some(members.iter().map(|m| m.request).collect()),
+        Command::SubmitSpeculativeBatch { members, .. } => Some(members.iter().map(|m| m.request).collect()),
+        _ => None,
+    };
+    if let Some(members) = submissions {
+        if members.is_empty() || members.len() > 8 || members.iter().enumerate().any(|(i, r)| members[..i].contains(r)) {
+            return Err(fail(INVALID, "invalid or duplicate batch members"));
+        }
+        if active(slot) || shared.slots.iter().any(|s| active(s) && members.iter().any(|r| s.members.contains(r))) {
             return Err(fail(BUSY, "lane or request is already owned"));
         }
+        let proposing = matches!(message.command, Command::SubmitSpeculative { .. } | Command::SubmitSpeculativeBatch { .. });
         shared.slots[lane] = Slot {
-            request: Some(*request),
+            request: Some(members[0]), members,
+            grouped: matches!(message.command, Command::SubmitBatch { .. } | Command::SubmitSpeculativeBatch { .. }),
             pending: true,
-            phase: if matches!(message.command, Command::SubmitSpeculative { .. }) { "proposing" } else { "" },
-            proposal_command: matches!(message.command, Command::SubmitSpeculative { .. }).then_some(message.id),
+            phase: if proposing { "proposing" } else { "" },
+            proposal_command: proposing.then_some(message.id),
             ..Default::default()
         };
     } else {
@@ -68,7 +74,7 @@ pub(super) fn reserve(client: &Client, message: &Message) -> Api<usize> {
             Command::Execute { .. } => slot.phase == "prepared",
             Command::AcquireLogits { .. } => slot.phase == "ready",
             Command::ReleaseLogits { .. } => slot.phase == "leased",
-            Command::Commit { .. } => matches!(slot.phase, "ready" | "consumed"),
+            Command::Commit { .. } | Command::CommitBatch { .. } => matches!(slot.phase, "ready" | "consumed"),
             Command::Cancel { .. } => matches!(
                 slot.phase,
                 "prepared" | "executing" | "ready" | "consumed" | "failed"
@@ -188,7 +194,7 @@ async fn control<B: Bank>(
                     .slots
                     .iter()
                     .any(|slot| {
-                        active(slot) && work.iter().any(|w| Some(w.request) == slot.request)
+                        active(slot) && work.iter().any(|w| slot.members.contains(&w.request))
                     })
                 {
                     client.reply(
@@ -216,7 +222,7 @@ async fn control<B: Bank>(
                     .expect("client state")
                     .slots
                     .iter()
-                    .any(|s| active(s) && s.request == Some(*request));
+                    .any(|s| active(s) && s.members.contains(request));
                 client.reply(
                     id,
                     if busy {
@@ -272,15 +278,20 @@ async fn control<B: Bank>(
 
 pub(super) enum Finish {
     Commit(Message, u32),
+    CommitBatch(Message, Vec<u32>),
     Cancel(Message),
 }
 
 /// The descriptor escapes only while this function retains the actual Rust
 /// Logits borrow. No mutable context operation is possible inside this scope.
+pub(super) enum Acceptance {
+    Single(std::ops::RangeInclusive<usize>),
+    Batch(Vec<usize>),
+}
 pub(super) async fn result_scope<F: Fence>(
     output: Logits<'_>,
     ticket: Ticket,
-    accepted_range: std::ops::RangeInclusive<usize>,
+    acceptance: Acceptance,
     fence: &mut F,
     client: &Client,
     receive: &mut mpsc::Receiver<LaneMessage>,
@@ -358,7 +369,7 @@ pub(super) async fn result_scope<F: Fence>(
                 );
             }
             Command::Commit { accepted, .. } if lease.is_none() => {
-                if !accepted_range.contains(&(*accepted as usize)) {
+                if !matches!(&acceptance, Acceptance::Single(range) if range.contains(&(*accepted as usize))) {
                     clear_pending(client, ticket.lane);
                     client.reply(
                         id,
@@ -368,6 +379,14 @@ pub(super) async fn result_scope<F: Fence>(
                 }
                 let accepted = *accepted;
                 return Finish::Commit(message, accepted);
+            }
+            Command::CommitBatch { accepted, .. } if lease.is_none() => {
+                if !matches!(&acceptance, Acceptance::Batch(rows) if rows.len() == accepted.len()
+                    && rows.iter().zip(accepted).all(|(&rows, &n)| n as usize <= rows)) {
+                    clear_pending(client, ticket.lane);
+                    client.reply(id, Err(fail(INVALID, "accepted vector outside batch contract"))); continue;
+                }
+                let accepted = accepted.clone(); return Finish::CommitBatch(message, accepted);
             }
             Command::Cancel { .. } if lease.is_none() => return Finish::Cancel(message),
             _ => {
@@ -388,6 +407,17 @@ async fn lane<B: Bank, D: SpeculativeDriver, F: Fence>(
     while let Some(LaneMessage::Command(message)) = receive.recv().await {
         let id = message.id;
         let prepared = match message.command {
+            Command::SubmitBatch { placement, members, .. } => batch::prepare(bank, context, placement, members)
+                .map(|ticket| (ticket, None)),
+            Command::SubmitSpeculativeBatch { placement, members, .. } => {
+                let inputs = members.into_iter().map(|m| SpeculativeInput { request: m.request,
+                    expected_committed_end: m.expected_committed_end, anchor: m.anchor,
+                    remaining_output_tokens: m.remaining_output_tokens, placement }).collect();
+                match proposal::prepare_batch(bank, context, &client, &mut receive, id, inputs).await {
+                    Some(result) => result.map(|p| (p.ticket, Some((vec![], p.draft_us)))),
+                    None => continue,
+                }
+            }
             Command::Submit { request, expected_committed_end, work, .. } =>
                 prepare_full(bank, context, request, expected_committed_end, work)
                     .map(|ticket| (ticket, None)),
@@ -416,7 +446,15 @@ async fn lane<B: Bank, D: SpeculativeDriver, F: Fence>(
         };
         client.update(ticket, "prepared", None);
         let mut reply = json!({"state":"prepared","ticket":ticket});
-        if let Some((tokens, draft_us)) = proposed {
+        if context.job.as_ref().unwrap().grouped {
+            match batch::prepared(bank, context, ticket, proposed.as_ref().map_or(0, |(_, us)| *us)) {
+                Ok(prepared) => reply = prepared,
+                Err(error) => {
+                    let _ = context.cancel(ticket); client.update(ticket, "cancelled", None);
+                    client.reply(id, Err(error)); continue;
+                }
+            }
+        } else if let Some((tokens, draft_us)) = proposed {
             match proposal::frontiers(bank, ticket.request) {
                 Ok((end, draft)) => {
                     reply["tokens"] = json!(tokens); reply["draft_us"] = json!(draft_us);
@@ -447,7 +485,7 @@ async fn lane<B: Bank, D: SpeculativeDriver, F: Fence>(
             return;
         };
         if matches!(start.command, Command::Cancel { .. }) {
-            finish(bank, context, &client, ticket, Finish::Cancel(start));
+            finish(bank, context, &client, ticket, Finish::Cancel(start)).await;
             continue;
         }
         if !matches!(start.command, Command::Execute { .. }) {
@@ -472,7 +510,7 @@ async fn lane<B: Bank, D: SpeculativeDriver, F: Fence>(
         }; // dropped execution future drains retained cancellation guards
         let executed = match outcome {
             Err(Some(LaneMessage::Command(cancel))) => {
-                finish(bank, context, &client, ticket, Finish::Cancel(cancel));
+                finish(bank, context, &client, ticket, Finish::Cancel(cancel)).await;
                 continue;
             }
             Err(_) => {
@@ -484,14 +522,16 @@ async fn lane<B: Bank, D: SpeculativeDriver, F: Fence>(
         if let Err(error) = executed {
             client.update(ticket, "failed", Some(format!("{error:#}")));
             if let Some(LaneMessage::Command(cancel)) = receive.recv().await {
-                finish(bank, context, &client, ticket, Finish::Cancel(cancel));
+                finish(bank, context, &client, ticket, Finish::Cancel(cancel)).await;
             } else {
                 let _ = context.cancel(ticket);
                 return;
             }
             continue;
         }
-        let proposed_rows = context.job.as_ref().expect("ready job").input.tokens.len();
+        let job = context.job.as_ref().expect("ready job");
+        let acceptance = if job.grouped { Acceptance::Batch(job.inputs.iter().map(|i| i.tokens.len()).collect()) }
+            else { Acceptance::Single(0..=job.inputs[0].tokens.len()) };
         let output = match context.logits(ticket) {
             Ok(output) => output,
             Err(error) => {
@@ -504,24 +544,39 @@ async fn lane<B: Bank, D: SpeculativeDriver, F: Fence>(
         let action = result_scope(
             output,
             ticket,
-            0..=proposed_rows,
+            acceptance,
             fence,
             &client,
             &mut receive,
         )
         .await;
-        finish(bank, context, &client, ticket, action);
+        finish(bank, context, &client, ticket, action).await;
     }
 }
 
-fn finish<B: Bank, D: TargetDriver>(
+async fn finish<B: Bank, D: TargetDriver>(
     bank: &B,
     context: &mut TargetContext<D>,
     client: &Client,
     ticket: Ticket,
     action: Finish,
 ) {
+    let members = context.job.as_ref().map(|job| job.inputs.iter().map(|i| i.request).collect::<Vec<_>>()).unwrap_or_default();
+    let grouped = context.job.as_ref().is_some_and(|job| job.grouped);
     match action {
+        Finish::CommitBatch(message, accepted) => match context.commit_batch(ticket, &accepted).await {
+            Ok(_) => {
+                client.update(ticket, "committed", None);
+                client.reply(message.id, batch::frontiers(bank, &members, false).map(|members|
+                    json!({"state":"committed","ticket":ticket,"members":members,"bank":bank.info()})));
+            }
+            Err(error) => {
+                let reason = format!("{error:#}");
+                let _ = context.cancel(ticket);
+                client.update(ticket, "cancelled", Some(reason.clone()));
+                client.reply(message.id, Err(fail(FAILED, reason)));
+            }
+        },
         Finish::Commit(message, accepted) => match context.commit(ticket, accepted) {
             Ok(end) => {
                 client.update(ticket, "committed", None);
@@ -542,9 +597,12 @@ fn finish<B: Bank, D: TargetDriver>(
                 client.update(ticket, "cancelled", None);
                 client.reply(
                     message.id,
-                    proposal::frontiers(bank, ticket.request).map(|(end, draft)|
+                    if grouped {
+                        batch::frontiers(bank, &members, true).map(|members|
+                            json!({"state":"cancelled","ticket":ticket,"members":members,"bank":bank.info()}))
+                    } else { proposal::frontiers(bank, ticket.request).map(|(end, draft)|
                         json!({"state":"cancelled","ticket":ticket,"committed_end":end,
-                            "draft_committed_end":draft,"bank":bank.info()})),
+                            "draft_committed_end":draft,"bank":bank.info()})) },
                 );
             }
             Err(error) => {

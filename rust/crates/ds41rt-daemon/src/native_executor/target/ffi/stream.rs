@@ -173,11 +173,12 @@ async fn job<B: Backend, F: Fence>(
                     // Native replay metadata is relative to the final window;
                     // wire selection is the caller's absolute prompt selection.
                     logits.selected = &selected;
-                    actor::result_scope(logits, ticket, rows..=rows, fence, client, receive).await
+                    actor::result_scope(logits, ticket, actor::Acceptance::Single(rows..=rows), fence, client, receive).await
                 };
                 match action {
                     Finish::Commit(message, _) => Outcome::Commit(message, output.commit()),
                     Finish::Cancel(message) => Outcome::Cancel(message, output.cancel()),
+                    Finish::CommitBatch(..) => unreachable!("stream result rejects grouped commits"),
                 }
             }
         }

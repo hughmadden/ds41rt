@@ -161,7 +161,7 @@ impl<'s, 'a> NativeBank<'s, 'a> {
 }
 
 /// This batch owns native Engram staging and canonical request/cache bindings.
-pub struct NativeBatch { batch: RequestBatch, request: RequestHandle }
+pub struct NativeBatch { batch: RequestBatch, requests: Vec<RequestHandle>, queued: bool }
 pub struct NativeDriver<'s, 'w, 'a> {
     pass: &'s mut TargetPass<'w, 'a>,
     transport: &'s mut NativeTp4Wave<'a>,
@@ -191,7 +191,7 @@ unsafe impl TargetDriver for NativeDriver<'_, '_, '_> {
         let batch = self.requests.borrow().prepare(&[RequestTokens {
             lease: input.request, tokens: &input.tokens, image_mask: None, kind: input.kind,
         }])?;
-        Ok(NativeBatch { batch, request: input.request })
+        Ok(NativeBatch { batch, requests: vec![input.request], queued: false })
     }
     async fn execute(&mut self, batch: &mut NativeBatch, input: &TargetInput) -> Result<()> {
         self.pass.set_route_capture(self.draft.borrow().as_deref().is_some_and(NativeDraft::capture_routes));
@@ -210,7 +210,51 @@ unsafe impl TargetDriver for NativeDriver<'_, '_, '_> {
             draft.commit(self.pass,&mut requests,&mut batch.batch,accepted,true)?;
         } else {self.pass.commit(&mut requests,&mut batch.batch,&[accepted])?;}
         self.pass.set_route_capture(false);
-        requests.cache().committed_end(batch.request)
+        requests.cache().committed_end(batch.requests[0])
+    }
+    fn prepare_batch(&mut self, inputs: &[TargetInput]) -> Result<NativeBatch> {
+        let work = inputs.iter().map(|input| RequestTokens { lease: input.request, tokens: &input.tokens,
+            image_mask: None, kind: input.kind }).collect::<Vec<_>>();
+        let batch = self.requests.borrow().prepare(&work)?;
+        Ok(NativeBatch { batch, requests: inputs.iter().map(|i| i.request).collect(), queued: false })
+    }
+    async fn execute_batch(&mut self, batch: &mut NativeBatch, inputs: &[TargetInput]) -> Result<()> {
+        let mut offset = 0;
+        let selected = inputs.iter().flat_map(|input| {
+            let rows = input.selected.iter().map(|row| offset + row).collect::<Vec<_>>();
+            offset += input.tokens.len(); rows
+        }).collect::<Vec<_>>();
+        self.pass.set_route_capture(self.draft.borrow().as_deref().is_some_and(NativeDraft::capture_routes));
+        unsafe { self.pass.execute_shared(&self.requests, &mut batch.batch,
+            self.transport, inputs[0].placement, &selected).await?; }
+        Ok(())
+    }
+    async fn commit_batch(&mut self, batch: &mut NativeBatch, accepted: &[u32]) -> Result<Vec<u64>> {
+        self.requests.borrow().validate_acceptance(&batch.batch, accepted)?;
+        // Zero acceptance publishes no target/draft writes; retain every old
+        // frontier and retire only this executed batch's temporary state.
+        if accepted.iter().all(|&n| n == 0) {
+            self.pass.commit(&mut self.requests.borrow_mut(), &mut batch.batch, accepted)?;
+        } else {
+            // Mark before the first enqueue: dropping this future or any error
+            // must drain and revoke every member, including zero-accepted ones.
+            batch.queued = true;
+            if let Some(draft) = self.draft.borrow_mut().as_deref_mut() {
+                draft.begin_commit(self.lane, self.pass, &self.requests.borrow(), &batch.batch, accepted)?;
+            }
+            self.pass.enqueue_cache_commit(&self.requests.borrow(), &batch.batch, accepted)?;
+            loop {
+                let draft_ready = self.draft.borrow().as_deref().map(|d| d.poll_commit(self.lane)).transpose()?.unwrap_or(true);
+                if self.pass.poll_cache_commit()? && draft_ready { break; }
+                tokio::task::yield_now().await;
+            }
+            if let Some(draft) = self.draft.borrow_mut().as_deref_mut() {
+                draft.finish_commit(self.lane, self.pass, &mut self.requests.borrow_mut(), &mut batch.batch, accepted)?;
+            } else { self.pass.commit(&mut self.requests.borrow_mut(), &mut batch.batch, accepted)?; }
+            batch.queued = false;
+        }
+        self.pass.set_route_capture(false);
+        batch.requests.iter().map(|&request| self.requests.borrow().cache().committed_end(request)).collect()
     }
     fn drain(&mut self, batch: &mut NativeBatch) -> Result<()> {
         // Evaluate every drain even if one reports an error. No borrow of the
@@ -218,8 +262,14 @@ unsafe impl TargetDriver for NativeDriver<'_, '_, '_> {
         self.pass.set_route_capture(false);
         let transport = self.transport.synchronize();
         let commit = self.pass.abort_cache_commit(&mut self.requests.borrow_mut());
+        let draft = if batch.queued {
+            batch.queued = false;
+            if let Some(draft) = self.draft.borrow_mut().as_deref_mut() {
+                draft.abort_commit(self.lane, &mut self.requests.borrow_mut(), &mut batch.batch)
+            } else { self.requests.borrow_mut().revoke_batch(&mut batch.batch); Ok(()) }
+        } else { Ok(()) };
         let discard = self.pass.discard(&mut batch.batch);
-        transport.and(commit).and(discard)
+        transport.and(commit).and(draft).and(discard)
     }
 }
 

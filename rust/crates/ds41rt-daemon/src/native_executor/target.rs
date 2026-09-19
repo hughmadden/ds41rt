@@ -10,6 +10,8 @@ use std::{cell::{Cell, RefCell}, rc::Rc};
 mod native;
 mod ffi;
 mod speculative;
+mod batch;
+pub use batch::{BatchMember, BatchProposal, DraftBatch};
 pub use speculative::{SpeculativeInput, SpeculativeProposal, DraftTokens, SpeculativeDriver};
 pub use native::{with_target, NativeBank, NativeDriver, NativeTarget, TargetConfig, CacheInfo, DsparkConfig};
 pub use native::{StreamInput, StreamingResult};
@@ -85,7 +87,18 @@ impl Active {
         self.tickets.borrow_mut().push(ticket);
         Ok(ticket)
     }
-    fn finish(&self, ticket: Ticket) { self.tickets.borrow_mut().retain(|t| *t != ticket); }
+    fn claim_many(&self, requests: &[RequestHandle], lane: usize) -> Result<Ticket> {
+        ensure!(!requests.is_empty() && requests.len() <= 8, "invalid target member count");
+        for (i, &request) in requests.iter().enumerate() {
+            self.idle(request)?;
+            ensure!(!requests[..i].contains(&request), "duplicate target request");
+        }
+        ensure!(!self.tickets.borrow().iter().any(|t| t.lane == lane), "target lane busy");
+        let ticket = self.identity(requests[0], lane)?;
+        self.tickets.borrow_mut().extend(requests.iter().map(|&request| Ticket { request, ..ticket }));
+        Ok(ticket)
+    }
+    fn finish(&self, ticket: Ticket) { self.tickets.borrow_mut().retain(|t| t.id != ticket.id); }
 }
 
 /// Implemented by the retained native lane and CPU test device. It is not a
@@ -93,8 +106,9 @@ impl Active {
 ///
 /// # Safety
 /// `execute` must publish outputs only on completed success. Dropping its future
-/// must revoke pending outputs; `drain` must finish every device/transport read
-/// and write before returning (including errors). `commit` must publish only the
+/// must revoke pending outputs. A dropped `commit_batch` future must retain all
+/// unpublished device resources in its Batch until `drain`; `drain` must finish
+/// every device/transport read and write before returning (including errors). `commit` must publish only the
 /// accepted rows in the authoritative bank. Logits must borrow real lane storage.
 /// Implementations must remain on their constructing thread.
 #[allow(async_fn_in_trait)]
@@ -106,11 +120,25 @@ pub unsafe trait TargetDriver {
     fn logits<'a>(&'a self, batch: &'a Self::Batch) -> Result<Logits<'a>>;
     fn commit(&mut self, batch: &mut Self::Batch, accepted: u32) -> Result<u64>;
     fn drain(&mut self, batch: &mut Self::Batch) -> Result<()>;
+    /// A batch implementation must call one retained multi-request pass. The
+    /// default deliberately rejects grouping rather than issuing serial singles.
+    fn prepare_batch(&mut self, inputs: &[TargetInput]) -> Result<Self::Batch> {
+        ensure!(inputs.len() == 1, "driver does not support grouped target passes");
+        self.prepare(&inputs[0])
+    }
+    async fn execute_batch(&mut self, batch: &mut Self::Batch, inputs: &[TargetInput]) -> Result<()> {
+        ensure!(inputs.len() == 1, "driver does not support grouped target passes");
+        self.execute(batch, &inputs[0]).await
+    }
+    async fn commit_batch(&mut self, batch: &mut Self::Batch, accepted: &[u32]) -> Result<Vec<u64>> {
+        ensure!(accepted.len() == 1, "driver does not support grouped target publication");
+        Ok(vec![self.commit(batch, accepted[0])?])
+    }
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum Phase { Prepared, Executing, Ready, Failed }
-struct Job<B> { ticket: Ticket, input: TargetInput, batch: B, phase: Phase }
+struct Job<B> { ticket: Ticket, inputs: Vec<TargetInput>, grouped: bool, batch: B, phase: Phase }
 
 /// One independently progressing native context. `Rc` intentionally makes it
 /// neither Send nor Sync. Dropping an execution future leaves a cancellable job;
@@ -137,7 +165,7 @@ impl<D: TargetDriver> TargetContext<D> {
             Ok(batch) => batch,
             Err(error) => { self.active.finish(ticket); return Err(error); }
         };
-        self.job = Some(Job { ticket, input, batch, phase: Phase::Prepared });
+        self.job = Some(Job { ticket, inputs: vec![input], grouped: false, batch, phase: Phase::Prepared });
         Ok(ticket)
     }
     fn check(&self, ticket: Ticket) -> Result<()> {
@@ -150,7 +178,9 @@ impl<D: TargetDriver> TargetContext<D> {
         let job = self.job.as_mut().unwrap();
         ensure!(job.phase == Phase::Prepared, "target batch already executed");
         job.phase = Phase::Executing;
-        let result = self.driver.execute(&mut job.batch, &job.input).await;
+        let result = if job.grouped {
+            self.driver.execute_batch(&mut job.batch, &job.inputs).await
+        } else { self.driver.execute(&mut job.batch, &job.inputs[0]).await };
         job.phase = if result.is_ok() { Phase::Ready } else { Phase::Failed };
         result
     }
@@ -173,7 +203,8 @@ impl<D: TargetDriver> TargetContext<D> {
         self.check(ticket)?;
         let job = self.job.as_mut().unwrap();
         ensure!(job.phase == Phase::Ready, "target execution not complete");
-        ensure!(accepted as usize <= job.input.tokens.len(), "accepted rows exceed target batch");
+        ensure!(!job.grouped, "grouped target requires commit_batch");
+        ensure!(accepted as usize <= job.inputs[0].tokens.len(), "accepted rows exceed target batch");
         // Mark before publication so a failure can never expose old logits.
         job.phase = Phase::Failed;
         let end = match self.driver.commit(&mut job.batch, accepted) {
