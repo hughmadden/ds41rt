@@ -17,6 +17,9 @@ import pytest
 ROOT = Path(__file__).resolve().parents[2]
 WIDTHS = "1:64,16:192,80:192,256:192,1024:192,4096:192"
 CAPACITIES = (1, 16, 80, 256, 1024, 4096)
+# Diagnostic candidate: pair the daemon's dedicated capacity-16 execution
+# state with a width-64 capacity-16 GEMM. Only cap16 differs from WIDTHS.
+CANDIDATE_CAP16_WIDTHS = "1:64,16:64,80:192,256:192,1024:192,4096:192"
 
 
 def load_exporter(monkeypatch, name):
@@ -71,6 +74,34 @@ def test_invalid_cli_threshold_fails_before_any_export(monkeypatch, tmp_path, va
     export.assert_not_called()
 
 
+def test_candidate_cap16_profile_changes_only_cap16_width(monkeypatch, tmp_path):
+    module = load_exporter(monkeypatch, "export_b12x_v41_slices_aot")
+    export = Mock()
+    monkeypatch.setattr(module, "export", export)
+    monkeypatch.setattr(sys, "argv", ["export", "--output-dir", str(tmp_path),
+                                      "--rows", ",".join(map(str, CAPACITIES)),
+                                      "--width", CANDIDATE_CAP16_WIDTHS, "--role", "spark",
+                                      "--atomic-min-capacity", "4097"])
+    module.main()
+    export.assert_called_once_with(
+        tmp_path, CAPACITIES, {1: 64, 16: 64, 80: 192, 256: 192, 1024: 192, 4096: 192},
+        4097, "spark", standard_names=False,
+    )
+
+
+def test_candidate_cap16_profile_retains_existing_geometries():
+    # Capacities 1 and >= 80 must match the retained ordered profile exactly;
+    # the candidate differs only at capacity 16.
+    baseline = dict((int(pair.split(":")[0]), int(pair.split(":")[1]))
+                    for pair in WIDTHS.split(","))
+    candidate = dict((int(pair.split(":")[0]), int(pair.split(":")[1]))
+                     for pair in CANDIDATE_CAP16_WIDTHS.split(","))
+    assert set(candidate) == set(baseline) == set(CAPACITIES)
+    assert candidate[16] == 64 and baseline[16] == 192
+    assert {c: w for c, w in candidate.items() if c != 16} == {
+        c: w for c, w in baseline.items() if c != 16}
+
+
 def configure(tmp_path, *, width="", threshold="", architecture="121"):
     source = tmp_path / "source"
     source.mkdir()
@@ -103,6 +134,18 @@ def test_cmake_selects_explicit_ordered_or_atomic_slice_profile(tmp_path, thresh
     if threshold:
         expected += ["--atomic-min-capacity", threshold]
     assert args.split(";") == expected
+
+
+def test_cmake_accepts_candidate_cap16_width_map(tmp_path):
+    result, build = configure(tmp_path, width=CANDIDATE_CAP16_WIDTHS, threshold="4097")
+    assert result.returncode == 0, result.stderr
+    script, args = (build / "selection.txt").read_text().splitlines()
+    assert script == "export_b12x_v41_slices_aot.py"
+    assert args.split(";") == [
+        "--width", CANDIDATE_CAP16_WIDTHS,
+        "--rows", ",".join(map(str, CAPACITIES)), "--role", "spark",
+        "--atomic-min-capacity", "4097",
+    ]
 
 
 def test_cmake_default_keeps_recipe_exporter(tmp_path):

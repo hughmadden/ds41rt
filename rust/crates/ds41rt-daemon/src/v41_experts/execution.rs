@@ -14,6 +14,7 @@ use timing::ExpertTiming;
 pub(crate) struct ExpertExecutionBudget {
     pub scratch_bytes: usize,
     pub decode_scratch_bytes: usize,
+    pub batch16_scratch_bytes: usize,
     pub small_scratch_bytes: usize,
     pub hidden_bytes: usize,
     pub routing_bytes: usize,
@@ -24,6 +25,7 @@ impl ExpertExecutionBudget {
         [
             self.scratch_bytes,
             self.decode_scratch_bytes,
+            self.batch16_scratch_bytes,
             self.small_scratch_bytes,
             self.hidden_bytes,
             self.routing_bytes,
@@ -37,12 +39,66 @@ impl ExpertExecutionBudget {
     }
 }
 
-/// Dedicated decode state shares the wave's immutable weights and input buffers.
-/// Its arena and kernel are initialized before serving or graph capture.
-struct DecodeExecution<'library> {
+/// Dedicated below-capacity state shares the wave's immutable weights and
+/// input buffers. Its arena and kernel are initialized before serving or
+/// graph capture. Role-1 Spark waves may carry up to three: capacity 1
+/// (decode), capacity 16 (small batch) and capacity 80 (small), each
+/// allocated only when the configured capacity exceeds it.
+struct DedicatedExecution<'library> {
     kernel: V41ExpertKernel<'library>,
     scratch: DeviceAllocation<'library>,
     slots: [*mut c_void; 44],
+}
+
+/// Which dedicated below-capacity state serves a launch of exactly `rows`.
+/// `None` selects the configured-capacity main state. Selection is by live
+/// row count only, never by a decode/prefill label, and is shared by the
+/// budget planner and every serving/graph path so they cannot disagree.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum DedicatedState {
+    Decode,
+    Batch16,
+    Small,
+}
+
+fn select_dedicated_state(
+    rows: u32,
+    has_decode: bool,
+    has_batch16: bool,
+    small_capacity_rows: Option<u32>,
+) -> Option<DedicatedState> {
+    if rows == 1 && has_decode {
+        return Some(DedicatedState::Decode);
+    }
+    if rows <= 16 && has_batch16 {
+        return Some(DedicatedState::Batch16);
+    }
+    if let Some(capacity_rows) = small_capacity_rows {
+        if rows <= capacity_rows {
+            return Some(DedicatedState::Small);
+        }
+    }
+    None
+}
+
+/// Scratch bytes for the optional dedicated states, read from a
+/// per-capacity scratch table. Kept free of native-library calls so CPU
+/// tests can stub the table; the real caller passes
+/// `|c| library.v41_expert_info(c).map(|i| i.scratch_bytes)`.
+fn dedicated_scratch_bytes(
+    role: u32,
+    capacity: u32,
+    scratch_bytes: impl Fn(u32) -> Result<u64>,
+) -> Result<(usize, usize, usize)> {
+    let planned = |state_capacity: u32| -> Result<usize> {
+        usize::try_from(scratch_bytes(state_capacity)?)
+            .context("dedicated expert scratch overflow")
+    };
+    Ok((
+        if role == 1 && capacity > 1 { planned(1)? } else { 0 },
+        if role == 1 && capacity > 16 { planned(16)? } else { 0 },
+        if role == 1 && capacity > 80 { planned(80)? } else { 0 },
+    ))
 }
 
 /// One exclusive wave's buffers and graph borrow immutable resident weights.
@@ -53,8 +109,9 @@ pub(crate) struct ExpertExecution<'weights, 'library> {
     _weights: &'weights ExpertWeights<'library>,
     library: &'library NativeLibrary,
     kernel: V41ExpertKernel<'library>,
-    decode: Option<DecodeExecution<'library>>,
-    small: Option<DecodeExecution<'library>>,
+    decode: Option<DedicatedExecution<'library>>,
+    batch16: Option<DedicatedExecution<'library>>,
+    small: Option<DedicatedExecution<'library>>,
     reducer: V41RouteReducer<'library>,
     timing: Option<ExpertTiming<'library>>,
     scratch: DeviceAllocation<'library>,
@@ -85,18 +142,15 @@ impl<'library> ExpertWeights<'library> {
         let routing = (capacity as usize)
             .checked_mul(info.topk as usize * 8)
             .context("routing buffer overflow")?;
+        let (decode_scratch_bytes, batch16_scratch_bytes, small_scratch_bytes) =
+            dedicated_scratch_bytes(info.role, capacity, |capacity| {
+                Ok(library.v41_expert_info(capacity)?.scratch_bytes)
+            })?;
         Ok(ExpertExecutionBudget {
             scratch_bytes: usize::try_from(info.scratch_bytes)?,
-            decode_scratch_bytes: if info.role == 1 && capacity > 1 {
-                usize::try_from(library.v41_expert_info(1)?.scratch_bytes)?
-            } else {
-                0
-            },
-            small_scratch_bytes: if info.role == 1 && capacity > 80 {
-                usize::try_from(library.v41_expert_info(80)?.scratch_bytes)?
-            } else {
-                0
-            },
+            decode_scratch_bytes,
+            batch16_scratch_bytes,
+            small_scratch_bytes,
             hidden_bytes: hidden,
             routing_bytes: routing,
             output_and_shared_bytes: (capacity as usize)
@@ -171,47 +225,50 @@ impl<'library> ExpertWeights<'library> {
             )?;
             library.cuda_stream_synchronize(stream.raw)?;
         }
-        let prepare_small = |planned_capacity, scratch_bytes| -> Result<Option<DecodeExecution<'library>>> {
-            if scratch_bytes == 0 { return Ok(None); }
-            let decode_kernel = library.v41_expert_kernel(planned_capacity)?;
-            ensure!(
-                decode_kernel.info().input_dtype == kernel.info().input_dtype,
-                "decode and grouped expert input formats differ"
-            );
-            let decode_scratch = DeviceAllocation::new(library, scratch_bytes)?;
-            let mut decode_slots = slots;
-            unsafe {
-                decode_kernel.bind_scratch(
-                    decode_scratch.buffer.ptr,
-                    decode_scratch.buffer.bytes as u64,
-                    &mut decode_slots,
-                )?;
-            }
-            self.bind(&decode_kernel, &mut decode_slots)?;
-            unsafe {
-                let initialized = decode_kernel.initialize_scratch(
-                    decode_scratch.buffer.ptr,
-                    decode_scratch.buffer.bytes as u64,
-                    stream.raw,
+        let prepare_dedicated =
+            |planned_capacity, scratch_bytes| -> Result<Option<DedicatedExecution<'library>>> {
+                if scratch_bytes == 0 { return Ok(None); }
+                let dedicated_kernel = library.v41_expert_kernel(planned_capacity)?;
+                ensure!(
+                    dedicated_kernel.info().input_dtype == kernel.info().input_dtype,
+                    "dedicated and grouped expert input formats differ"
                 );
-                // Drain even on initialization failure before releasing its arena.
-                let drained = library.cuda_stream_synchronize(stream.raw);
-                initialized.and(drained)?;
-            }
-            Ok(Some(DecodeExecution {
-                kernel: decode_kernel,
-                scratch: decode_scratch,
-                slots: decode_slots,
-            }))
-        };
-        let decode = prepare_small(1, budget.decode_scratch_bytes)?;
-        let small = prepare_small(80, budget.small_scratch_bytes)?;
+                let dedicated_scratch = DeviceAllocation::new(library, scratch_bytes)?;
+                let mut dedicated_slots = slots;
+                unsafe {
+                    dedicated_kernel.bind_scratch(
+                        dedicated_scratch.buffer.ptr,
+                        dedicated_scratch.buffer.bytes as u64,
+                        &mut dedicated_slots,
+                    )?;
+                }
+                self.bind(&dedicated_kernel, &mut dedicated_slots)?;
+                unsafe {
+                    let initialized = dedicated_kernel.initialize_scratch(
+                        dedicated_scratch.buffer.ptr,
+                        dedicated_scratch.buffer.bytes as u64,
+                        stream.raw,
+                    );
+                    // Drain even on initialization failure before releasing its arena.
+                    let drained = library.cuda_stream_synchronize(stream.raw);
+                    initialized.and(drained)?;
+                }
+                Ok(Some(DedicatedExecution {
+                    kernel: dedicated_kernel,
+                    scratch: dedicated_scratch,
+                    slots: dedicated_slots,
+                }))
+            };
+        let decode = prepare_dedicated(1, budget.decode_scratch_bytes)?;
+        let batch16 = prepare_dedicated(16, budget.batch16_scratch_bytes)?;
+        let small = prepare_dedicated(80, budget.small_scratch_bytes)?;
         Ok(ExpertExecution {
             stream,
             _weights: self,
             library,
             kernel,
             decode,
+            batch16,
             small,
             reducer,
             timing,
@@ -244,10 +301,13 @@ impl<'weights, 'library> ExpertExecution<'weights, 'library> {
         self.synchronize()?;
         let mut slots = self.slots;
         weights.bind(&self.kernel, &mut slots)?;
-        for decode in [&mut self.decode, &mut self.small].into_iter().flatten() {
-            let mut decode_slots = decode.slots;
-            weights.bind(&decode.kernel, &mut decode_slots)?;
-            decode.slots = decode_slots;
+        for dedicated in [&mut self.decode, &mut self.batch16, &mut self.small]
+            .into_iter()
+            .flatten()
+        {
+            let mut decode_slots = dedicated.slots;
+            weights.bind(&dedicated.kernel, &mut decode_slots)?;
+            dedicated.slots = decode_slots;
         }
         self.slots = slots;
         self._weights = weights;
@@ -296,17 +356,28 @@ impl<'weights, 'library> ExpertExecution<'weights, 'library> {
         &[*mut c_void; 44],
         &DeviceAllocation<'library>,
     ) {
-        if rows == 1 {
-            if let Some(decode) = &self.decode {
-                return (&decode.kernel, &decode.slots, &decode.scratch);
+        match select_dedicated_state(
+            rows,
+            self.decode.is_some(),
+            self.batch16.is_some(),
+            self.small
+                .as_ref()
+                .map(|small| small.kernel.info().capacity_rows),
+        ) {
+            Some(DedicatedState::Decode) => {
+                let decode = self.decode.as_ref().expect("selected decode state");
+                (&decode.kernel, &decode.slots, &decode.scratch)
             }
-        }
-        if let Some(small) = &self.small {
-            if rows <= small.kernel.info().capacity_rows {
-                return (&small.kernel, &small.slots, &small.scratch);
+            Some(DedicatedState::Batch16) => {
+                let batch16 = self.batch16.as_ref().expect("selected batch16 state");
+                (&batch16.kernel, &batch16.slots, &batch16.scratch)
             }
+            Some(DedicatedState::Small) => {
+                let small = self.small.as_ref().expect("selected small state");
+                (&small.kernel, &small.slots, &small.scratch)
+            }
+            None => (&self.kernel, &self.slots, &self.scratch),
         }
-        (&self.kernel, &self.slots, &self.scratch)
     }
 
     pub fn synchronize(&self) -> Result<()> {
@@ -736,3 +807,5 @@ impl ExpertExecution<'_, '_> {
 mod mapped_tests;
 #[cfg(test)]
 mod trace_tests;
+#[cfg(test)]
+mod selection_tests;
