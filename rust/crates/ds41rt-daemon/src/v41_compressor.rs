@@ -11,6 +11,7 @@ use std::{
 pub(crate) mod source_cache;
 mod commit;
 use commit::PendingCommit;
+mod input_trace;
 mod prefix;
 pub(crate) use prefix::{CompressorPrefix, COMPRESSOR_PREFIX_BYTES};
 use source_cache::SourceCache;
@@ -240,6 +241,9 @@ pub(crate) struct CompressorWeights<'a> {
     layer: usize,
     ratio: usize,
     names: Vec<String>,
+    /// Shared-weights trace root already dumped by an earlier selected trace;
+    /// interior mutability keeps the read-only dump on `&self` waves.
+    trace_root: std::cell::RefCell<Option<std::path::PathBuf>>,
 }
 impl<'a> CompressorWeights<'a> {
     fn names(layer: usize) -> Result<Vec<String>> {
@@ -276,6 +280,7 @@ impl<'a> CompressorWeights<'a> {
             layer,
             ratio: ratio(layer)?,
             names,
+            trace_root: Default::default(),
         })
     }
     pub fn wave(&self, rows: usize, budget: usize) -> Result<CompressorWave<'_, 'a>> {
@@ -959,6 +964,102 @@ impl CompressorWave<'_, '_> {
             _wave: std::marker::PhantomData,
         })
     }
+    /// Read-only diagnostic dump of this wave's completed producer: the exact
+    /// live operands and outputs of the compression that attention/index
+    /// consumers are about to read, plus the pending-state planes and the
+    /// already-loaded projection weights for later component replay.
+    ///
+    /// The single explicit call site is the target pass's selected detail
+    /// layer, after the producers completed and before any commit mutates the
+    /// pending state. Never called from `output()`, which serves live
+    /// consumers repeatedly. Validates the completed identity (owner, chunks,
+    /// versions, ends) through `output`, synchronizes this wave's own stream —
+    /// no graph capture is open here — retains every borrowed buffer through
+    /// the copies, and changes no device state.
+    pub fn trace_completed(&self, state: &CompressorState<'_>, directory: &std::path::Path,
+        weights_directory: &std::path::Path) -> Result<()> {
+        let prepared = self.ready.as_ref().context("compressor output incomplete")?;
+        input_trace::ensure_completed_trace_ready(
+            self.pending_query.is_some(),
+            self.pending_commit.is_some(),
+            Some(prepared.owner),
+            state.owner,
+            self.weights.layer,
+            state.layer,
+        )?;
+        // Full owner/chunk/version/end validation against the live state.
+        self.output(state)?;
+        // The wave's own stream: drained producers by contract, and never
+        // inside a capture (poll_query and execute_query both settle it).
+        self.synchronize()?;
+        let mut chunks = Vec::with_capacity(prepared.chunks.len());
+        for (i, &chunk) in prepared.chunks.iter().enumerate() {
+            let slot = state.validate_identity(chunk.lease)?;
+            chunks.push(input_trace::CompressorTraceChunk {
+                index: i,
+                request_id: state.request_id(chunk.lease)?,
+                slot,
+                generation: chunk.lease.generation,
+                version: prepared.versions[i],
+                position: chunk.position,
+                tokens: chunk.tokens,
+                offset: prepared.offsets[i],
+            });
+        }
+        let pending = state.pending.as_ref().map(|pair| [pair[0].buffer, pair[1].buffer]);
+        let buffers = input_trace::CompressorTraceBuffers {
+            input: self.input.buffer,
+            projected: self.projected.buffer,
+            scores: self.scores.as_ref().map(|scores| scores.buffer),
+            output: self.output.buffer,
+            frequencies: self.frequencies.buffer,
+            positions: self.positions.buffer,
+            descriptors: self.descriptors.as_ref().map(|descriptors| descriptors.buffer),
+            kv_values: self.kv_values.buffer,
+            kv_scales: self.kv_scales.buffer,
+            pending_kv: pending.map(|pair| pair[0]),
+            pending_scores: pending.map(|pair| pair[1]),
+        };
+        // Immutable weights are shared by every wave of this layer. Copy them
+        // once per explicit trace root; a failed write never marks the root
+        // complete and create_new prevents silent replacement.
+        let weights = if self.weights.trace_root.borrow().as_deref() == Some(weights_directory) {
+            None
+        } else {
+            Some(input_trace::CompressorTraceWeights {
+                wkv: self.weights.tensors.get(&self.weights.names[0])?,
+                norm: self.weights.tensors.get(&self.weights.names[1])?,
+                wgate: if self.weights.ratio == 2 {
+                    Some(self.weights.tensors.get(&self.weights.names[2])?)
+                } else {
+                    None
+                },
+                names: std::array::from_fn(|index| self.weights.names[index].clone()),
+            })
+        };
+        input_trace::capture_compressor_inputs(
+            self.weights.library,
+            directory,
+            self.weights.layer,
+            self.weights.ratio,
+            state.slot_count,
+            prepared.snapshot,
+            &chunks,
+            &prepared.completed,
+            if self.descriptors.is_some() {
+                Some(&prepared.descriptors)
+            } else {
+                None
+            },
+            &buffers,
+            weights_directory,
+            weights.as_ref(),
+        )?;
+        if weights.is_some() {
+            *self.weights.trace_root.borrow_mut() = Some(weights_directory.to_path_buf());
+        }
+        Ok(())
+    }
     /// Validate an enclosing cache transaction's exact request order/proposal.
     pub(crate) fn validate_batch(
         &self,
@@ -1008,3 +1109,7 @@ impl<'a> CompressorState<'a> {
         &self.index
     }
 }
+
+#[cfg(test)]
+#[path = "v41_compressor/input_trace_tests.rs"]
+mod input_trace_tests;

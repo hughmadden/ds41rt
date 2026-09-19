@@ -18,6 +18,14 @@ use ds41rt_loader::OfficialV41Catalog;
 const SOURCES: [usize; 4] = [2, 8, 14, 20];
 const INDEX: [usize; 8] = [2, 8, 14, 20, 24, 28, 32, 36];
 
+/// Pure CPU selection of the source producer a selected trace may read: only
+/// layers that produce a fresh compressed source in this stage. Non-source
+/// layers and stages that reuse committed sources (decoder/encoder replay)
+/// skip explicitly, so no stale producer output is ever read.
+pub(crate) fn trace_source_index(layer: usize, reuses_sources: bool) -> Option<usize> {
+    SOURCES.iter().position(|&l| l == layer).filter(|_| !reuses_sources)
+}
+
 enum PreparedFfn<'l, 'w, 'a> {
     Ready(LaneFfn<'l, 'w, 'a>),
     Pending(PendingLaneFfn<'l, 'w, 'a>),
@@ -434,6 +442,21 @@ impl<'w, 'a> BackboneExecution<'w, 'a> {
         Ok(())
     }
 
+    /// Read-only diagnostic dump of this layer's completed compressed-source
+    /// producer at the existing detail-trace selection. Explicitly skips
+    /// layers that produce no fresh source (non-source layers, or stages that
+    /// reuse committed sources), so the default and skipped paths do no device
+    /// work at all; the selected path reads only completed, validated state
+    /// before any commit mutates it.
+    pub fn trace_compressor(&self, bank: &BackboneCache<'_>, batch: &CacheBatch, layer: usize,
+        directory: &std::path::Path, weights_directory: &std::path::Path) -> Result<()> {
+        let Some(index) = trace_source_index(layer, batch.stage().reuses_sources()) else {
+            return Ok(());
+        };
+        let state = bank.source(batch, layer)?;
+        self.sources[index].trace_completed(state, directory, weights_directory)
+    }
+
     /// # Safety
     /// Keep the lane query and this batch's admitted cache slots immutable and
     /// alive until the returned producer completes or drains on drop.
@@ -652,6 +675,22 @@ impl<'w, 'a> BackboneExecution<'w, 'a> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn compressor_trace_selection_skips_non_sources_and_reusing_stages() {
+        // Fresh-producing stages trace exactly the four source layers, in
+        // SOURCES order; every other layer of the 40-layer pass skips.
+        for (index, layer) in SOURCES.into_iter().enumerate() {
+            assert_eq!(trace_source_index(layer, false), Some(index));
+        }
+        for layer in [0, 1, 3, 7, 9, 13, 15, 19, 21, 39] {
+            assert_eq!(trace_source_index(layer, false), None);
+        }
+        // Stages that reuse committed sources never read the producer: the
+        // ready wave belongs to an earlier producing pass.
+        for layer in SOURCES {
+            assert_eq!(trace_source_index(layer, true), None);
+        }
+    }
     #[test]
     fn official_cache_producer_allocation_plan() -> Result<()> {
         let Some(path) = std::env::var_os("DS41RT_LANE_PLAN_LIBRARY") else {
