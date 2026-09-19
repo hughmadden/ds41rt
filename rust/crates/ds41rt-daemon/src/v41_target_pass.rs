@@ -303,6 +303,10 @@ impl<'w, 'a> TargetPass<'w, 'a> {
             }
         }
         for layer in stage.windows() {
+            let detail_trace = activation_trace.as_ref().filter(|_| {
+                std::env::var("DS41RT_ACTIVATION_TRACE_DETAIL_LAYER").ok()
+                    .and_then(|value| value.parse::<usize>().ok()) == Some(layer)
+            });
             if layer != stage.windows().start {
                 let prepare_timing = Instant::now();
                 self.lane.advance()?;
@@ -355,6 +359,9 @@ impl<'w, 'a> TargetPass<'w, 'a> {
                 tracing::debug!(target: "ds41rt::timing", layer, rows, advance_us, engram_us, taps_us=tapped_us-advance_us-engram_us, begin_us=prepare_timing.elapsed().as_micros() as u64-tapped_us, "target layer preparation");
             }
             unsafe {
+                if let Some(directory) = detail_trace {
+                    self.lane.trace_query(directory)?;
+                }
                 let cooperative = requests.cooperative_completion();
                 if cooperative {
                     let mut production = requests.with_requests(|requests| self.execution.enqueue_production_and_index(
@@ -372,6 +379,9 @@ impl<'w, 'a> TargetPass<'w, 'a> {
                             &mut self.lane, &mut self.index)
                     }
                 })?;
+                let prepared = if let Some(directory) = detail_trace {
+                    prepared.trace_input(directory).await?
+                } else { prepared };
                 // No RefCell guard or bank reference survives into this await.
                 let completed = prepared.execute(transport, placement, guard.batch.image_mask()).await?;
                 if cooperative {

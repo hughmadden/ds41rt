@@ -160,6 +160,13 @@ pub(crate) struct LaneFfn<'s, 'w, 'a> {
     route_capture: Option<&'s mut Vec<Vec<[u32; 6]>>>,
 }
 impl LaneFfn<'_, '_, '_> {
+    pub fn trace_input(&self, directory: &std::path::Path) -> Result<()> {
+        trace_buffers(self.library, directory, self.input.layer, &[
+            ("ffn-residual", self.input.residual),
+            ("ffn-pre", self.input.incoming_pre),
+            ("ffn-values", self.input.values),
+        ])
+    }
     #[cfg(test)]
     pub async unsafe fn check_queued_components(&mut self, image_mask: &[u8],
         mut local: Option<&mut crate::v41_experts::local::LocalExpertWave<'_>>) -> Result<()> {
@@ -708,16 +715,17 @@ impl<'w, 'a> BackboneLane<'w, 'a> {
     }
     /// Opt-in diagnostic at a completed layer boundary; never used by normal serving.
     pub fn trace_output(&self, directory: &std::path::Path) -> Result<()> {
-        use std::io::Write;
         let output = self.output()?;
-        for (name, buffer) in [("residual", output.residual), ("pre", output.pre)] {
-            let path = directory.join(format!("layer{}-{name}.bin", output.layer));
-            let mut file = std::fs::OpenOptions::new().write(true).create_new(true).open(path)?;
-            let mut bytes = vec![0; buffer.bytes];
-            self.weights.library.copy_d2h(&mut bytes, buffer)?;
-            file.write_all(&bytes)?;
-        }
-        Ok(())
+        trace_buffers(self.weights.library, directory, output.layer,
+            &[("residual", output.residual), ("pre", output.pre)])
+    }
+    pub fn trace_query(&self, directory: &std::path::Path) -> Result<()> {
+        let query = self.query_output()?;
+        trace_buffers(self.weights.library, directory, query.layer, &[
+            ("query-hidden", query.hidden), ("query-raw_rank", query.raw_rank),
+            ("query-normalized_rank", query.normalized_rank),
+            ("query-projected", query.projected), ("query-rotated", query.rotated),
+        ])
     }
     pub fn advance(&mut self) -> Result<()> {
         self.enter(Phase::Complete)?;
@@ -733,6 +741,19 @@ impl<'w, 'a> BackboneLane<'w, 'a> {
         self.phase = Phase::Prepared;
         Ok(())
     }
+}
+
+fn trace_buffers(library: &NativeLibrary, directory: &std::path::Path,
+    layer: usize, buffers: &[(&str, Ds41rtDeviceBuffer)]) -> Result<()> {
+    use std::io::Write;
+    for &(name, buffer) in buffers {
+        let path = directory.join(format!("layer{layer}-{name}.bin"));
+        let mut file = std::fs::OpenOptions::new().write(true).create_new(true).open(path)?;
+        let mut bytes = vec![0; buffer.bytes];
+        library.copy_d2h(&mut bytes, buffer)?;
+        file.write_all(&bytes)?;
+    }
+    Ok(())
 }
 
 #[cfg(test)]

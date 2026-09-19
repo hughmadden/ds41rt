@@ -70,6 +70,15 @@ impl CompletedLayer<'_> {
     }
 }
 impl PreparedLayer<'_, '_, '_> {
+    pub async fn trace_input(mut self, directory: &std::path::Path) -> Result<Self> {
+        let ffn = match self.ffn {
+            PreparedFfn::Ready(ffn) => ffn,
+            PreparedFfn::Pending(pending) => pending.complete().await?,
+        };
+        ffn.trace_input(directory)?;
+        self.ffn = PreparedFfn::Ready(ffn);
+        Ok(self)
+    }
     #[cfg(test)]
     pub async unsafe fn trace_ffn_input(mut self, library: &ds41rt_ffi::NativeLibrary,
         destination: ds41rt_ffi::Ds41rtDeviceBuffer, stream: *mut std::ffi::c_void)
