@@ -18,7 +18,7 @@ mkdir -- "$output"
 python3 "$source_root/scripts/verify-sparkinfer-source.py" \
   --source "$DS41RT_SPARKINFER_SOURCE_DIR" --lock "$DS41RT_SPARKINFER_LOCK_FILE" \
   >"$output/source-check.txt"
-python3 "$DS41RT_SPARKINFER_SOURCE_DIR/tests/gemm/test_native_aot_split1.py" \
+python3 "$DS41RT_SPARKINFER_SOURCE_DIR/tests/gemm/test_native_aot_small_m.py" \
   >"$output/b12x-cpu-tests.txt" 2>&1
 python3 "$source_root/python/tests/test_v41_fp8_aot_options.py" \
   >"$output/exporter-cpu-tests.txt" 2>&1
@@ -36,7 +36,7 @@ print(json.dumps({'device': props.name, 'physical_sms': props.multi_processor_co
 PY
 python3 "$source_root/python/tools/export_b12x_v41_fp8_aot.py" \
   --output-dir "$output/aot" --projections o_b \
-  --rows 1,16,80,256,1024,4096 --wob-m1-split1
+  --rows 1,16,80,256,1024,4096 --wob-m16-split2
 runtime_dir="$(python3 -m cutlass.cute.export.aot_config --libdir)"
 objects=("$output/aot/"*.o)
 if [[ ${#objects[@]} != 13 ]]; then
@@ -63,10 +63,15 @@ import zoneinfo
 output, lock = map(Path, sys.argv[1:])
 manifest = json.loads((output / 'aot/v41_fp8.json').read_text())
 assert manifest['physical_sms'] == 170 and manifest['capability'] == [12, 0]
-assert manifest['wob_m1_split1'] is True
+assert manifest['wob_m16_split2'] is True and manifest['wob_m1_split1'] is False
 assert len(manifest['variants']) == 6
-assert all(v['label'].startswith('v41_o_b_') and v['split_k_slices'] == 1
+assert all(v['label'].startswith('v41_o_b_') and
+           v['split_k_slices'] == (2 if v['capacity'] in (1, 16) else 1)
            for v in manifest['variants'])
+small = next(v for v in manifest['variants'] if v['capacity'] == 16)
+assert small['wob_small_m_policy']['mma_tile_mn'] == [16, 64]
+assert small['split_k_bytes'] == 2 * 16 * 5120 * 4
+assert small['gemm_output_dtype'] == 'FP32'
 files = [p for p in output.rglob('*') if p.is_file()]
 record = {
     'kind': 'component-only-not-serving-native',

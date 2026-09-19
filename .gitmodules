@@ -1,7 +1,7 @@
 [submodule "third_party/sparkinfer"]
 	path = third_party/sparkinfer
 	url = https://github.com/hughmadden/b12x.git
-	branch = codex/afd-wob-split1-aot
+	branch = codex/afd-wob-m16-split2-aot
 [submodule "third_party/xgrammar"]
 	path = third_party/xgrammar
 	url = https://github.com/mlc-ai/xgrammar.git

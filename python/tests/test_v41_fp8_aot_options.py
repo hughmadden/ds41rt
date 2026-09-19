@@ -36,6 +36,8 @@ class V41Fp8AotOptionsTests(unittest.TestCase):
                 and kwargs["size_k"] >= 4096 and kwargs["num_groups"] == 1) else 1
             if kwargs.get("force_split_k_one") and not self.ignore_override:
                 slices = 1
+            if kwargs.get("wob_small_m_split2") and not self.ignore_override:
+                slices = 2
             return Compiled(), slices
 
         def module(name, **attrs):
@@ -65,7 +67,7 @@ class V41Fp8AotOptionsTests(unittest.TestCase):
 
     def export(self, output, **kwargs):
         with patch.dict(sys.modules, self.modules), patch.dict(self.module.os.environ, {}), contextlib.redirect_stdout(io.StringIO()):
-            self.module.export(output, (1, 16), **kwargs)
+            self.module.export(output, (1, 16, 80, 256, 1024, 4096), **kwargs)
         return json.loads((output / "v41_fp8.json").read_text())
 
     def test_default_preserves_every_projection_compiler_call(self):
@@ -123,6 +125,68 @@ class V41Fp8AotOptionsTests(unittest.TestCase):
         with patch.object(sys, "argv", [str(SCRIPT), "--output-dir", "/unused", "--wob-m1-split1"]):
             self.module.main()
         self.assertTrue(seen[0][1]["wob_m1_split1"])
+
+    def test_small_m_opt_in_changes_only_cap16_wo_b(self):
+        with tempfile.TemporaryDirectory() as directory:
+            default = self.export(Path(directory) / "default")
+            before = list(self.calls)
+            self.calls.clear()
+            explicit = self.export(Path(directory) / "small", wob_m16_split2=True)
+        changes = [(old, new) for old, new in zip(before, self.calls, strict=True) if old != new]
+        self.assertEqual(len(changes), 1)
+        old, new = changes[0]
+        self.assertEqual((new["size_m"], new["size_k"], new["size_n"]), (16, 8192, 5120))
+        self.assertEqual(new, dict(old, wob_small_m_split2=True))
+        self.assertTrue(explicit["wob_m16_split2"])
+        for old, new in zip(default["variants"], explicit["variants"], strict=True):
+            if new["label"] == "v41_o_b_fp8_m16":
+                self.assertEqual(new["split_k_slices"], 2)
+                self.assertEqual(new["split_k_bytes"], 2 * 16 * 5120 * 4)
+                self.assertEqual(new["scratch_bytes"], new["split_k_offset"] + new["split_k_bytes"])
+                self.assertEqual(new["split_k_offset"] % 256, 0)
+                self.assertEqual(new["gemm_output_dtype"], "FP32")
+                self.assertEqual(new["wob_small_m_policy"], {
+                    "mma_tile_mn": [16, 64], "tile_k": 128, "split_k_slices": 2,
+                    "direct_one_m_tile_scheduler": True, "activation_io": "all_row_tma",
+                    "reduction": "ordered_fp32_then_bf16"})
+            else:
+                self.assertEqual(old, new)
+
+    def test_small_m_explicit_false_preserves_default(self):
+        with tempfile.TemporaryDirectory() as directory:
+            default = self.export(Path(directory) / "default")
+            before = list(self.calls)
+            self.calls.clear()
+            explicit = self.export(Path(directory) / "false", wob_m16_split2=False)
+        self.assertEqual(before, self.calls)
+        self.assertEqual(default, explicit)
+
+    def test_small_m_ignored_policy_cannot_publish_manifest(self):
+        self.ignore_override = True
+        with tempfile.TemporaryDirectory() as directory:
+            output = Path(directory) / "bad"
+            with self.assertRaisesRegex(ValueError, "split2"):
+                self.export(output, wob_m16_split2=True)
+            self.assertFalse((output / "v41_fp8.json").exists())
+
+    def test_small_m_missing_target_and_conflicts_fail(self):
+        with tempfile.TemporaryDirectory() as directory, patch.dict(sys.modules, self.modules):
+            for rows, projections in [((1,), self.module.PROJECTIONS),
+                ((16,), tuple(p for p in self.module.PROJECTIONS if p[0] != "o_b"))]:
+                with self.assertRaisesRegex(ValueError, "o_b.*capacity16"):
+                    self.module.export(Path(directory), rows, projections, wob_m16_split2=True)
+            with self.assertRaisesRegex(ValueError, "conflict"):
+                self.export(Path(directory), wob_m1_split1=True, wob_m16_split2=True)
+            with self.assertRaisesRegex(ValueError, "boolean"):
+                self.export(Path(directory), wob_m16_split2=1)
+        self.assertEqual(self.calls, [])
+
+    def test_small_m_cli_forwards_option(self):
+        seen = []
+        self.module.export = lambda *args, **kwargs: seen.append((args, kwargs))
+        with patch.object(sys, "argv", [str(SCRIPT), "--output-dir", "/unused", "--wob-m16-split2"]):
+            self.module.main()
+        self.assertTrue(seen[0][1]["wob_m16_split2"])
 
 
 if __name__ == "__main__":
