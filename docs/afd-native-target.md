@@ -8,8 +8,8 @@ all 129280 logits were byte-identical between contexts and source credits
 returned after release. This is a correctness smoke, not a throughput result.
 The full-target C ABI at `0dad275c` subsequently passed a real Python/Torch CUDA
 consumer probe (package `dff621b`, 19 September 2026 09:57 AEST): golden hashes,
-consumer fences, cancellation, credits and teardown passed. The new streaming
-C ABI mode has separate CPU lifetime tests and still needs live qualification.
+consumer fences, cancellation, credits and teardown passed. The streaming C ABI at `4ec58286` also passed the campaign parent's
+external-consumer probe, including the 370-token multichunk golden output.
 
 `native_executor::target::with_target(config, callback)` loads the native library
 and coordinator weights using the original one-RTX constructor, then supplies
@@ -32,8 +32,9 @@ allocate another physical KV bank. Its startup allocations are the retained
 weights, two context workspaces, two transports, Engram staging and native cache;
 the retained constructor also includes the original vision workspace. These
 allocations are planned before KV sizing. The explicit target configuration
-disables local routed layers, dSpark and prefix/snapshot retention for this first
-binding; those are not yet integrated through this interface.
+disables local routed layers and prefix/snapshot retention. dSpark is optional
+and disabled by default; its shared native ownership and proposal API are described
+in [the speculative binding](afd-native-speculative.md).
 
 ## Callable contract
 
@@ -54,6 +55,8 @@ Capacity uses the original constructor's AOT rounding (80 requested rows require
 capacity 256 because the retained encoder suffix reservation covers 128 rows).
 The compact vocabulary head has capacity 48 in this target-only configuration.
 Request tokens and selected rows remain owned until publication or cancellation.
+`TargetConfig.dspark` optionally binds retained draft weights, windows and proposals;
+target-only callers pass `None`.
 
 | API | Contract |
 | --- | --- |
@@ -87,8 +90,9 @@ Never construct the schema-1 `CacheCommands` metadata prototype beside it.
 The C ABI exposes full target execution and an exclusive encoder-stream mode.
 The retained [streaming facade](afd-native-streaming.md) passed bounded GPU probes;
 the new actor mode switch uses that facade while holding both contexts through
-result consumption. This C ABI streaming mode still needs live qualification. Prefix
-snapshots, image inputs and dSpark transactions are not bound here. The full-target
+result consumption. This C ABI streaming mode passed a bounded external-consumer GPU probe. Prefix
+snapshots and image inputs remain unbound; optional [dSpark transactions](afd-native-speculative.md)
+now have CPU ownership/ABI coverage and await their own enabled GPU qualification. The full-target
 interface rejects encoder/replay-stage requests. No native sampler is exposed;
 the vLLM adapter must consume logits using its existing sampling semantics.
 

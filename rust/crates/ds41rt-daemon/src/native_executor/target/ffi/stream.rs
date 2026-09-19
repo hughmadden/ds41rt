@@ -18,6 +18,7 @@ pub(super) trait Backend {
     async fn execute<'a>(&'a mut self, input: StreamInput) -> Result<Self::Ready<'a>>;
     fn revoke(&self, request: RequestHandle) -> Result<()>;
     fn info(&self) -> Value;
+    fn draft_end(&self, _request: RequestHandle) -> Result<Option<u64>> { Ok(None) }
 }
 
 pub(super) async fn run<B: Backend, F: Fence>(
@@ -183,11 +184,13 @@ async fn job<B: Backend, F: Fence>(
     }; // no Ready/logits/future borrow survives into bank operations below
     match outcome {
         Outcome::Commit(message, Ok(end)) => {
+            let draft_end = backend.draft_end(ticket.request)?;
+            ensure!(draft_end.is_none_or(|draft| draft == end), "streaming draft frontier differs");
             client.update(ticket, "committed", None);
             client.reply(
                 message.id,
                 Ok(json!({"state":"committed","ticket":ticket,
-                "committed_end":end,"bank":backend.info()})),
+                "committed_end":end,"draft_committed_end":draft_end,"bank":backend.info()})),
             );
         }
         Outcome::Commit(message, Err(error)) => {

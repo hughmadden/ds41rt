@@ -4,6 +4,7 @@ pub(super) trait Bank {
     fn info(&self) -> Value;
     fn admit(&self, slot: usize, id: u64) -> Result<RequestHandle>;
     fn end(&self, request: RequestHandle) -> Result<u64>;
+    fn draft_end(&self, _request: RequestHandle) -> Result<Option<u64>> { Ok(None) }
     fn release(&self, request: RequestHandle) -> Result<()>;
     fn can_prepare(&self, work: &[(RequestHandle, u32)]) -> Result<bool>;
 }
@@ -43,7 +44,7 @@ pub(super) fn reserve(client: &Client, message: &Message) -> Api<usize> {
     if slot.pending {
         return Err(fail(BUSY, "lane command pending"));
     }
-    if let Command::Submit { request, .. } = &message.command {
+    if let Command::Submit { request, .. } | Command::SubmitSpeculative { request, .. } = &message.command {
         if active(slot)
             || shared
                 .slots
@@ -55,6 +56,8 @@ pub(super) fn reserve(client: &Client, message: &Message) -> Api<usize> {
         shared.slots[lane] = Slot {
             request: Some(*request),
             pending: true,
+            phase: if matches!(message.command, Command::SubmitSpeculative { .. }) { "proposing" } else { "" },
+            proposal_command: matches!(message.command, Command::SubmitSpeculative { .. }).then_some(message.id),
             ..Default::default()
         };
     } else {
@@ -98,7 +101,7 @@ pub(super) enum Exit {
     Stream(Message),
 }
 
-pub(super) async fn run<B: Bank, D: TargetDriver, F: Fence>(
+pub(super) async fn run<B: Bank, D: SpeculativeDriver, F: Fence>(
     bank: &B,
     contexts: [&mut TargetContext<D>; 2],
     fences: &mut [F; 2],
@@ -152,19 +155,30 @@ async fn control<B: Bank>(
                     return Ok(Exit::Stream(message));
                 }
             }
+            Command::CancelProposal { command_id } => {
+                let lane = {
+                    let state = client.state.lock().expect("client state");
+                    state.slots.iter().position(|slot| slot.proposal_command == Some(*command_id)
+                        && slot.phase == "proposing")
+                };
+                if let Some(lane) = lane {
+                    if lanes[lane].send(LaneMessage::Command(message)).await.is_err() {
+                        client.reply(id, Err(fail(FAILED, "native proposal lane stopped")));
+                    }
+                } else { proposal::completed(bank, &client, id, *command_id); }
+            }
             Command::Poll { ticket } => client.reply(id, client.poll(*ticket)),
             Command::Info { request } => {
                 let end = request
                     .map(|r| bank.end(r))
                     .transpose()
                     .map_err(native_error);
-                client.reply(
-                    id,
-                    end.map(|end| {
-                        json!({"state":"info","bank":bank.info(),
-                    "request":request,"committed_end":end})
-                    }),
-                );
+                let draft = request.map(|r| bank.draft_end(r)).transpose().map_err(native_error);
+                client.reply(id, end.and_then(|end| draft.map(|draft| {
+                    json!({"state":"info","bank":bank.info(),"request":request,
+                        "committed_end":end,"draft_committed_end":draft.flatten()})
+                })));
+
             }
             Command::CanPrepare { work } => {
                 if client
@@ -364,7 +378,7 @@ pub(super) async fn result_scope<F: Fence>(
     }
 }
 
-async fn lane<B: Bank, D: TargetDriver, F: Fence>(
+async fn lane<B: Bank, D: SpeculativeDriver, F: Fence>(
     bank: &B,
     context: &mut TargetContext<D>,
     fence: &mut F,
@@ -373,57 +387,62 @@ async fn lane<B: Bank, D: TargetDriver, F: Fence>(
 ) {
     while let Some(LaneMessage::Command(message)) = receive.recv().await {
         let id = message.id;
-        let Command::Submit {
-            request,
-            expected_committed_end,
-            work,
-            ..
-        } = message.command
-        else {
-            if let Some(ticket) = message.command.ticket() {
-                clear_pending(&client, ticket.lane);
+        let prepared = match message.command {
+            Command::Submit { request, expected_committed_end, work, .. } =>
+                prepare_full(bank, context, request, expected_committed_end, work)
+                    .map(|ticket| (ticket, None)),
+            Command::SubmitSpeculative { request, expected_committed_end, anchor,
+                remaining_output_tokens, placement, .. } => {
+                match proposal::prepare(bank, context, &client, &mut receive, id,
+                    SpeculativeInput { request, expected_committed_end, anchor,
+                        remaining_output_tokens, placement }).await {
+                    Some(result) => result.map(|p| (p.ticket, Some((p.tokens, p.draft_us)))),
+                    None => continue,
+                }
             }
-            client.reply(id, Err(fail(STALE, "target lane has no live batch")));
-            continue;
-        };
-        let Work::FullTarget {
-            tokens,
-            selected,
-            kind,
-            placement,
-        } = work
-        else {
-            unreachable!("stream work switches out of lane actors");
-        };
-        let prepared = (|| -> Api<Ticket> {
-            let end = bank.end(request).map_err(native_error)?;
-            if end != expected_committed_end {
-                return Err(fail(STALE, "native committed frontier differs from grant"));
+            Command::CancelProposal { command_id } => {
+                proposal::completed(bank, &client, id, command_id); continue;
             }
-            context
-                .submit(TargetInput {
-                    request,
-                    tokens,
-                    selected,
-                    placement,
-                    kind: match kind {
-                        Kind::Prefill => SourceKind::Prefill,
-                        Kind::Decode => SourceKind::Decode,
-                    },
-                })
-                .map_err(native_error)
-        })();
-        let ticket = match prepared {
-            Ok(ticket) => ticket,
+            _ => {
+                client.reply(id, Err(fail(STALE, "target lane has no live batch"))); continue;
+            }
+        };
+        let (ticket, proposed) = match prepared {
+            Ok(value) => value,
             Err(error) => {
                 client.state.lock().expect("client state").slots[context.lane] = Slot::default();
-                client.reply(id, Err(error));
-                continue;
+                client.reply(id, Err(error)); continue;
             }
         };
         client.update(ticket, "prepared", None);
-        client.reply(id, Ok(json!({"state":"prepared","ticket":ticket})));
-        let Some(LaneMessage::Command(start)) = receive.recv().await else {
+        let mut reply = json!({"state":"prepared","ticket":ticket});
+        if let Some((tokens, draft_us)) = proposed {
+            match proposal::frontiers(bank, ticket.request) {
+                Ok((end, draft)) => {
+                    reply["tokens"] = json!(tokens); reply["draft_us"] = json!(draft_us);
+                    reply["bank"] = bank.info(); reply["committed_end"] = json!(end);
+                    reply["draft_committed_end"] = json!(draft);
+                }
+                Err(error) => {
+                    let _ = context.cancel(ticket); client.update(ticket, "cancelled", None);
+                    client.reply(id, Err(error)); continue;
+                }
+            }
+        }
+        client.reply(id, Ok(reply));
+        // A cancellation can have been routed while the scoped proposal became
+        // ready. Return its ticket without consuming the original prepared ACK.
+        let start = loop {
+            match receive.recv().await {
+                Some(LaneMessage::Command(message)) => {
+                    if let Command::CancelProposal { command_id } = message.command {
+                        proposal::completed(bank, &client, message.id, command_id);
+                    } else { break Some(LaneMessage::Command(message)); }
+                }
+                other => break other,
+            }
+        };
+        let Some(LaneMessage::Command(start)) = start else {
             let _ = context.cancel(ticket);
             return;
         };
@@ -506,8 +525,10 @@ fn finish<B: Bank, D: TargetDriver>(
         Finish::Commit(message, accepted) => match context.commit(ticket, accepted) {
             Ok(end) => {
                 client.update(ticket, "committed", None);
-                client.reply(message.id,
-                Ok(json!({"state":"committed","ticket":ticket,"committed_end":end,"bank":bank.info()})));
+                let result = bank.draft_end(ticket.request).map_err(native_error).map(|draft|
+                    json!({"state":"committed","ticket":ticket,"committed_end":end,
+                        "draft_committed_end":draft,"bank":bank.info()}));
+                client.reply(message.id, result);
             }
             Err(error) => {
                 let reason = format!("{error:#}");
@@ -521,7 +542,9 @@ fn finish<B: Bank, D: TargetDriver>(
                 client.update(ticket, "cancelled", None);
                 client.reply(
                     message.id,
-                    Ok(json!({"state":"cancelled","ticket":ticket,"bank":bank.info()})),
+                    proposal::frontiers(bank, ticket.request).map(|(end, draft)|
+                        json!({"state":"cancelled","ticket":ticket,"committed_end":end,
+                            "draft_committed_end":draft,"bank":bank.info()})),
                 );
             }
             Err(error) => {
@@ -531,4 +554,36 @@ fn finish<B: Bank, D: TargetDriver>(
             }
         },
     }
+}
+
+fn prepare_full<B: Bank, D: TargetDriver>(bank: &B, context: &mut TargetContext<D>,
+    request: RequestHandle, expected_committed_end: u64, work: Work) -> Api<Ticket> {
+        let Work::FullTarget {
+            tokens,
+            selected,
+            kind,
+            placement,
+        } = work
+        else {
+            unreachable!("stream work switches out of lane actors");
+        };
+        (|| -> Api<Ticket> {
+            let end = bank.end(request).map_err(native_error)?;
+            if end != expected_committed_end {
+                return Err(fail(STALE, "native committed frontier differs from grant"));
+            }
+            context
+                .submit(TargetInput {
+                    request,
+                    tokens,
+                    selected,
+                    placement,
+                    kind: match kind {
+                        Kind::Prefill => SourceKind::Prefill,
+                        Kind::Decode => SourceKind::Decode,
+                    },
+                })
+                .map_err(native_error)
+        })()
+
 }

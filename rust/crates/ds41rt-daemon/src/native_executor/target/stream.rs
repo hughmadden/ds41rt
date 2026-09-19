@@ -102,6 +102,7 @@ struct NativeStreamDriver<'r, 's, 'w, 'a> {
     suffix: Option<EncoderSuffix<'a>>,
     replay_batch: Option<RequestBatch>,
     begun: bool,
+    draft_id: u64,
 }
 impl StreamDriver for NativeStreamDriver<'_, '_, '_, '_> {
     fn begin(&mut self, plan: &StreamPlan) -> Result<()> {
@@ -142,8 +143,13 @@ impl StreamDriver for NativeStreamDriver<'_, '_, '_, '_> {
     }
     fn commit(&mut self, plan: &StreamPlan) -> Result<u64> {
         let mut requests = self.target.bank.requests.borrow_mut();
-        self.target.contexts[0].driver.pass.commit(&mut requests,
-            self.replay_batch.as_mut().unwrap(), &[(plan.end - plan.start) as u32])?;
+        let pass = &mut self.target.contexts[0].driver.pass;
+        let batch = self.replay_batch.as_mut().unwrap();
+        if let Some(draft) = self.target.bank.draft.borrow_mut().as_deref_mut() {
+            // Only the retained final-window decoder taps seed dSpark. Encoder
+            // source publication is not an accepted draft/model prefix.
+            draft.commit(pass, &mut requests, batch, (plan.end - plan.start) as u32, false)?;
+        } else { pass.commit(&mut requests, batch, &[(plan.end - plan.start) as u32])?; }
         ensure!(requests.cache().stage(plan.request)? == CacheStage::Full,
             "native decoder replay did not return to full phase");
         requests.cache().committed_end(plan.request)
@@ -164,7 +170,9 @@ impl StreamDriver for NativeStreamDriver<'_, '_, '_, '_> {
             self.target.bank.active.poisoned.set(true);
             return drained;
         }
-        let released = requests.release_if_present(plan.request);
+        let draft = self.target.bank.draft.borrow_mut().as_deref_mut()
+            .map(|draft| draft.release(self.draft_id)).transpose();
+        let released = requests.release_if_present(plan.request).and(draft.map(|_| ()));
         if released.is_err() { self.target.bank.active.poisoned.set(true); }
         released
     }
@@ -220,7 +228,12 @@ impl<'s, 'w, 'a> NativeTarget<'s, 'w, 'a> {
     }
     pub(crate) fn revoke_stream_admission(&self, request: RequestHandle) -> Result<()> {
         self.bank.active.healthy()?;
-        self.bank.requests.borrow_mut().release_if_present(request)
+        let id = self.bank.requests.borrow().cache().request_id(request).ok();
+        let draft = id.map(|id| self.bank.draft.borrow_mut().as_deref_mut()
+            .map(|draft| draft.release(id)).transpose()).transpose();
+        let released = self.bank.requests.borrow_mut().release_if_present(request).and(draft.map(|_| ()));
+        if released.is_err() { self.bank.active.poisoned.set(true); }
+        released
     }
 
     /// Fresh-prompt CED: retained two-context encoder overlap, then one decoder
@@ -230,8 +243,9 @@ impl<'s, 'w, 'a> NativeTarget<'s, 'w, 'a> {
         keep_running: &dyn Fn() -> bool) -> Result<StreamingResult<'r, 's, 'w, 'a>> {
         self.validate_stream(&input)?;
         let plan = StreamPlan::new(&input, self.stream_chunk_rows, self.contexts[0].driver.max_context)?;
+        let draft_id = self.bank.requests.borrow().cache().request_id(input.request)?;
         let mut session = StreamSession { driver: NativeStreamDriver { target: self,
-            suffix: None, replay_batch: None, begun: false }, plan, tokens: input.tokens,
+            suffix: None, replay_batch: None, begun: false, draft_id }, plan, tokens: input.tokens,
             ready: false, armed: true };
         session.execute(keep_running).await?;
         Ok(StreamingResult { session })

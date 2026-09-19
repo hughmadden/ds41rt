@@ -349,13 +349,17 @@ impl<'w, 'a, C: DraftChain<'a>> DraftRuntime<'w, 'a, C> {
         }
         Ok(())
     }
-    #[cfg(test)]
-    pub(crate) fn validate_position(&self, id: u64, end: u64) -> Result<()> {
+    pub(crate) fn committed_end(&self, id: u64) -> Result<Option<u64>> {
         let request = self.requests.get(&id).context("draft request not admitted")?;
+        let end = self.windows[0].committed_end(request.leases[0])?;
         for (window, lease) in self.windows.iter().zip(request.leases) {
             ensure!(window.request_id(lease)? == id, "draft request identity differs");
-            ensure!(window.committed_end(lease)? == Some(end), "draft position differs");
+            ensure!(window.committed_end(lease)? == end, "draft stage frontiers differ");
         }
+        Ok(end)
+    }
+    pub(crate) fn validate_position(&self, id: u64, end: u64) -> Result<()> {
+        ensure!(self.committed_end(id)? == (end != 0).then_some(end), "draft position differs");
         Ok(())
     }
     pub fn commit(
@@ -536,6 +540,14 @@ impl<'w, 'a, C: DraftChain<'a>> DraftRuntime<'w, 'a, C> {
     }
 }
 impl<'w, 'a> DraftRuntime<'w, 'a> {
+    /// Drain the native proposal reader before allowing request/lane reuse.
+    /// A failed CUDA drain retains the pending seeds and read reservations.
+    pub(crate) fn cancel_propose(&mut self, lane: usize) -> Result<()> {
+        ensure!(lane < self.chains.len(), "invalid draft lane");
+        self.chains[lane].cancel_pending()?;
+        self.pending[lane] = None;
+        Ok(())
+    }
     /// Inputs are (request identity, anchor, committed end, remaining output budget).
     /// Returned rows retain input order; short histories/budgets use the anchor only.
     pub fn propose(&mut self, lib: &'a NativeLibrary,

@@ -22,11 +22,15 @@ extern "C" {
  * the native resource owner has exited. BUSY preserves the handle and resources.
  * Unknown, foreign and destroyed handles/consumed commands return STALE.
  *
- * Config (all required): owner, snapshot, native_lib, peers[4], batch_tokens,
+ * Required config: owner, snapshot, native_lib, peers[4], batch_tokens,
  * max_context_tokens, slots, source_pool_budget_bytes. owner is a nonzero fresh
  * incarnation nonce, never reused across process restarts. source budget means
  * paired source payload, rounded down to native page groups; reported cache_bytes
  * additionally includes fixed windows and metadata. No second KV bank is created.
+ * Optional dspark:null|{draft_limit:1..5,adaptive:bool,confidence_cutoff:null|p}.
+ * Absent/null disables draft allocations. p must be finite in (0,1]; adaptive
+ * and confidence-only policies are exclusive. Enabled draft requires slots>=2.
+ * Draft weights/windows are constructed once by the same retained constructor.
  *
  * Commands (strict JSON object with op):
  * info {request?: {owner,slot,generation}}
@@ -55,6 +59,32 @@ extern "C" {
  * and after failure) adds revoked:true to its ACK: the entire admission is gone,
  * so discard its request lease and do not release/reuse it. Normal actors resume
  * only after completion/revocation; full_target cancellation is unchanged.
+ * submit_speculative {lane,request,expected_committed_end,anchor:u32,
+ *                     remaining_output_tokens:usize,placement:u64}
+ * Requires enabled dSpark and a committed full-target prefix. anchor is already
+ * emitted but not yet processed as input. remaining_output_tokens is 1..1048576;
+ * proposals are bounded by that envelope, draft_limit+1 and remaining context.
+ * Retained drafts are greedy (q(proposed)=1); no draft probabilities are invented.
+ * The original command remains pending while the native chain runs. Reply:
+ * {state:"prepared",ticket,tokens:[anchor,drafts...],draft_us,bank,
+ *  committed_end,draft_committed_end}. Every actual token row is selected for
+ * target verification; logits positions are expected_committed_end+[0..M-1].
+ * cancel_proposal {command_id:original_submit_speculative_command}
+ * If cancellation wins, readers drain before ACK {state:"proposal_cancelled",
+ * proposal_command,request,committed_end,draft_committed_end,bank}; original reply
+ * is FAILED(6,"native proposal cancelled") and must also be collected. If native
+ * preparation already completed, ACK {state:"proposal_completed",proposal_command,
+ * ticket,committed_end,draft_committed_end,bank}; collect original prepared reply
+ * then cancel its ticket normally. The completion race never discards the ticket.
+ * Full-target/stream commits seed draft windows when enabled. Verification commit
+ * accepted counts INPUT rows (anchor+accepted draft prefix), not a correction or
+ * bonus token that remains the next unprocessed anchor. All target/draft/Engram
+ * publication uses the retained joint native transaction. Ordinary cancel keeps
+ * that prior accepted prefix. info(request), commit and nonrevoking cancel ACKs
+ * report draft_committed_end from all three native windows: null if disabled,
+ * logical zero if enabled but unseeded. Otherwise it must match committed_end.
+ * No native sampler replaces vLLM's target sampling/rejection policy.
+ *
  * execute {ticket}, poll {ticket}, acquire_logits {ticket}
  * release_logits {ticket,lease:u64,consumer_stream:"0x..."}
  * commit {ticket,accepted:u32}, cancel {ticket}, release {request}, shutdown {}

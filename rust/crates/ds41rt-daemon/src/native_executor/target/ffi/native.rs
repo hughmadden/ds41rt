@@ -12,6 +12,7 @@ impl actor::Bank for NativeBank<'_, '_> {
     fn end(&self, request: RequestHandle) -> Result<u64> {
         self.committed_end(request)
     }
+    fn draft_end(&self, request: RequestHandle) -> Result<Option<u64>> { self.draft_committed_end(request) }
     fn release(&self, request: RequestHandle) -> Result<()> {
         NativeBank::release(self, request)
     }
@@ -98,6 +99,7 @@ pub(super) fn run(
             max_context_tokens: config.max_context_tokens,
             slots: config.slots,
             cache_bytes: config.source_pool_budget_bytes,
+            dspark: config.dspark,
         },
         |mut target| {
             let runtime = target.runtime();
@@ -164,5 +166,8 @@ impl<'s, 'w, 'a> stream::Backend for NativeTarget<'s, 'w, 'a> {
     }
     fn info(&self) -> Value {
         actor::Bank::info(self.bank())
+    }
+    fn draft_end(&self, request: RequestHandle) -> Result<Option<u64>> {
+        self.bank().draft_committed_end(request)
     }
 }

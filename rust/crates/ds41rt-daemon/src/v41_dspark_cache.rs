@@ -6,8 +6,6 @@ use ds41rt_ffi::{
 };
 use std::{
     ffi::c_void,
-    cell::Cell,
-    rc::Rc,
     sync::atomic::{AtomicU64, Ordering},
 };
 static NEXT_OWNER: AtomicU64 = AtomicU64::new(1);
@@ -46,61 +44,20 @@ pub(crate) struct WindowRead {
     pub descriptors: [V41AttentionWindow; 16],
     _reservation: ReadReservation,
 }
-// Reservations outlive the short host borrow while a chain reads ring slots.
-// Other request slots may be committed, but a live read slot cannot be rewritten
-// or recycled until the chain has drained its GPU work.
-#[derive(Clone, Default)]
-struct SlotAccess(Rc<Cell<[u32; 16]>>);
-struct ReadReservation { slots: SlotAccess, used: [bool; 16] }
-const WRITE_RESERVED: u32 = u32::MAX;
-struct WriteReservation { slots: SlotAccess, used: [bool; 16] }
-impl SlotAccess {
-    fn writable(&self, slot: usize) -> Result<()> {
-        ensure!(self.0.get()[slot] == 0, "dSpark cache slot has outstanding access");
-        Ok(())
+pub(crate) mod access;
+use access::{SlotAccess, ReadReservation, WriteReservation, WRITE_RESERVED};
+// The retained ring's admission rule also covers long-prefill final-window seeds.
+pub(crate) fn append_end(prior: Option<u64>, position: u64, tokens: u32) -> Result<u64> {
+    ensure!(tokens > 0, "empty committed cache append");
+    let end = position.checked_add(u64::from(tokens)).context("cache position overflow")?;
+    if let Some(prior) = prior {
+        ensure!(position == prior, "non-contiguous committed cache append");
+    } else {
+        ensure!(position == 0 || tokens >= 128, "cache tail seed must fill the window");
     }
-    fn readable(&self, slot: usize) -> Result<()> {
-        ensure!(self.0.get()[slot] != WRITE_RESERVED, "dSpark cache write is unpublished");
-        Ok(())
-    }
-    fn reserve_write(&self, used: [bool; 16]) -> Result<WriteReservation> {
-        let mut counts = self.0.get();
-        for (i, active) in used.iter().enumerate() {
-            if *active { self.writable(i)?; counts[i] = WRITE_RESERVED; }
-        }
-        self.0.set(counts);
-        Ok(WriteReservation { slots: self.clone(), used })
-    }
-    fn reserve(&self, used: [bool; 16]) -> Result<ReadReservation> {
-        let mut counts = self.0.get();
-        for (i, active) in used.iter().enumerate() {
-            if *active {
-                ensure!(counts[i] < WRITE_RESERVED-1, "dSpark slot is reserved or reader count exhausted");
-                counts[i] += 1;
-            }
-        }
-        self.0.set(counts);
-        Ok(ReadReservation { slots: self.clone(), used })
-    }
+    Ok(end)
 }
-impl Drop for ReadReservation {
-    fn drop(&mut self) {
-        let mut counts = self.slots.0.get();
-        for (i, active) in self.used.iter().enumerate() {
-            if *active { counts[i] -= 1; }
-        }
-        self.slots.0.set(counts);
-    }
-}
-impl Drop for WriteReservation {
-    fn drop(&mut self) {
-        let mut counts = self.slots.0.get();
-        for (i, active) in self.used.iter().enumerate() {
-            if *active { debug_assert_eq!(counts[i], WRITE_RESERVED); counts[i] = 0; }
-        }
-        self.slots.0.set(counts);
-    }
-}
+
 pub(crate) struct DsparkWindow<'a> {
     prefix_copies: [crate::v41_memory::SnapshotCopies<'a, (WindowLease, DsparkPrefix<'a>, ReadReservation)>; 2],
     prefix_pool: Option<crate::v41_memory::SnapshotPool<'a>>,
@@ -280,21 +237,7 @@ impl<'a> DsparkWindow<'a> {
                     && chunk.tokens <= source_rows - chunk.source_row,
                 "invalid cache source span"
             );
-            let end = chunk
-                .position
-                .checked_add(u64::from(chunk.tokens))
-                .context("cache position overflow")?;
-            if let Some(prior) = self.slots[slot].end {
-                ensure!(
-                    chunk.position == prior,
-                    "non-contiguous committed cache append"
-                );
-            } else {
-                ensure!(
-                    chunk.position == 0 || chunk.tokens >= 128,
-                    "cache tail seed must fill the window"
-                );
-            }
+            let end = append_end(self.slots[slot].end, chunk.position, chunk.tokens)?;
             descriptors[i] = V41KvWrite {
                 position: chunk.position,
                 source_row: chunk.source_row,

@@ -16,6 +16,7 @@ use tokio::sync::mpsc;
 mod actor;
 mod native;
 mod stream;
+mod proposal;
 
 const OK: i32 = 0;
 const INVALID: i32 = 1;
@@ -48,6 +49,7 @@ struct Config {
     max_context_tokens: u32,
     slots: u32,
     source_pool_budget_bytes: usize,
+    dspark: Option<DsparkConfig>,
 }
 impl Config {
     fn validate(&self) -> Api<()> {
@@ -58,6 +60,10 @@ impl Config {
             || self.source_pool_budget_bytes == 0
         {
             return Err(fail(INVALID, "invalid native target geometry"));
+        }
+        if let Some(draft) = self.dspark {
+            draft.validate().map_err(|e| fail(INVALID, e.to_string()))?;
+            if self.slots < 2 { return Err(fail(INVALID, "dSpark requires two lanes")); }
         }
         Ok(())
     }
@@ -108,6 +114,15 @@ enum Command {
         expected_committed_end: u64,
         work: Work,
     },
+    SubmitSpeculative {
+        lane: usize,
+        request: RequestHandle,
+        expected_committed_end: u64,
+        anchor: u32,
+        remaining_output_tokens: usize,
+        placement: u64,
+    },
+    CancelProposal { command_id: u64 },
     Execute {
         ticket: Ticket,
     },
@@ -137,7 +152,7 @@ enum Command {
 impl Command {
     fn lane(&self) -> Option<usize> {
         match self {
-            Self::Submit { lane, .. } => Some(*lane),
+            Self::Submit { lane, .. } | Self::SubmitSpeculative { lane, .. } => Some(*lane),
             Self::Execute { ticket }
             | Self::Poll { ticket }
             | Self::AcquireLogits { ticket }
@@ -170,6 +185,7 @@ struct Slot {
     phase: &'static str,
     error: Option<String>,
     pending: bool,
+    proposal_command: Option<u64>,
 }
 struct Shared {
     replies: BTreeMap<u64, Option<Vec<u8>>>,
@@ -218,12 +234,17 @@ impl Client {
     fn update(&self, ticket: Ticket, phase: &'static str, error: Option<String>) {
         let mut shared = self.state.lock().expect("native client lock");
         let error = error.map(|s| s.chars().take(4096).collect());
+        let previous = &shared.slots[ticket.lane];
+        let proposal_command = if previous.ticket == Some(ticket) || previous.phase == "proposing" {
+            previous.proposal_command
+        } else { None };
         shared.slots[ticket.lane] = Slot {
             ticket: Some(ticket),
             request: Some(ticket.request),
             phase,
             error,
             pending: false,
+            proposal_command,
         };
     }
     fn poll(&self, ticket: Ticket) -> Api<Value> {

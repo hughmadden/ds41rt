@@ -312,3 +312,6 @@ fn dropping_context_drains_and_releases_its_batch_without_freeing_shared_bank() 
     f.bank.borrow_mut().release(&f.active, f.requests[1])?;
     Ok(())
 }
+
+#[path = "speculative_tests.rs"]
+mod speculative_tests;

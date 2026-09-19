@@ -66,7 +66,7 @@ strict; unknown fields and unsupported work phases are rejected.
 | Command | Successful `result` |
 | --- | --- |
 | initialization, ID 0 | `{state:"initialized",bank}` |
-| `info {request?}` | `{state:"info",bank,request,committed_end}`; last two fields null if omitted |
+| `info {request?}` | `{state:"info",bank,request,committed_end,draft_committed_end}`; request/frontiers null if omitted |
 | `admit {slot,request_id}` | `{state:"admitted",request,committed_end:0,bank}` |
 | `can_prepare {work:[{request,tokens}]}` | `{state:"capacity",can_prepare:bool,bank}` |
 | `submit {lane,request,expected_committed_end,work}` | `{state:"prepared",ticket}` |
@@ -74,10 +74,15 @@ strict; unknown fields and unsupported work phases are rejected.
 | `poll {ticket}` | `{state,ticket,error}` |
 | `acquire_logits {ticket}` | `{state:"leased",ticket,lease,device_pointer,device_id,bytes,rows,vocabulary:129280,dtype:"float32",selected,positions}` |
 | `release_logits {ticket,lease,consumer_stream:"0x..."}` | `{state:"consumed",ticket,lease}` after the native fence |
-| `commit {ticket,accepted}` | `{state:"committed",ticket,committed_end,bank}` |
-| `cancel {ticket}` | `{state:"cancelled",ticket,bank}` |
+| `commit {ticket,accepted}` | `{state:"committed",ticket,committed_end,draft_committed_end,bank}` |
+| `cancel {ticket}` | `{state:"cancelled",ticket,committed_end,draft_committed_end,bank}` for ordinary work |
 | `release {request}` | `{state:"released",request,bank}` |
 | `shutdown` | `{state:"closed"}` after resource teardown |
+
+Optional retained dSpark construction, `submit_speculative`, command-ID proposal
+cancellation, joint cache/frontier ACKs and external rejection sampling are defined
+in [the speculative contract](afd-native-speculative.md). Default construction
+remains target-only. No new native sampler or cache ledger is introduced.
 
 Full-target work is `{phase:"full_target",tokens:[u32],selected:[usize],
 kind:"prefill"|"decode",placement:u64}`. Tokens must be below 129280; selected
@@ -143,10 +148,10 @@ needs an actual native reservation/group-admission extension. This packet makes
 no guarantee that a standalone capacity query reserves future pages.
 
 Full-target and encoder-stream/final-decoder C ABI work are implemented. The
-retained streaming Rust facade passed GPU smoke tests; the new exclusive C ABI
-mode still needs its own live external-consumer qualification. No separate native cache
-initialization stage, vLLM prefix-cache mapping, multimodal/dSpark commands or
-serving activation is implemented here. No full-vocabulary host-copy operation
+retained streaming Rust facade and `4ec58286` exclusive C ABI passed bounded GPU
+external-consumer probes. Optional dSpark commands now have CPU proof and need their
+own enabled GPU qualification. No separate native cache initialization stage,
+vLLM prefix-cache mapping, multimodal commands or serving activation is implemented here. No full-vocabulary host-copy operation
 is exposed; the existing Rust diagnostic probe is separate from serving.
 
 ## Validation
@@ -161,7 +166,7 @@ reply consumption, bounded admission, nondestructive buffer-capacity errors,
 aggregate capacity exhaustion and corrected accepted-count retries. Native Rust
 lease/streaming tests and compile-fail lifetime checks run alongside them.
 
-Validation for this packet: 48 `native_executor` tests passed, including 16 C ABI
+Validation before the optional dSpark extension: 48 `native_executor` tests passed, including 16 C ABI
 cases; five rustdoc lifetime checks passed. Offline checks cover the library,
 binaries and examples. The development cdylib builds with the existing lockfile.
 The actual package Python client loaded the cdylib, received the asynchronous
@@ -174,8 +179,9 @@ full-vocabulary prefill/decode golden hashes, Torch views shared native logits
 storage, real consumer streams completed through native event ACKs, held-result
 commit guards worked, canceling the second decode left ends `[11,10]`, source
 credits returned, and close completed. This qualifies that bounded full-target
-external-consumer path. The new encoder-stream C ABI mode still needs a live
-probe; its preceding retained Rust streaming facade already passed GPU tests.
+external-consumer path. The campaign parent subsequently tested encoder-stream C ABI
+`4ec58286` with package `2174292f`, including the 370-token multichunk output against
+the prior direct-Rust golden. Optional dSpark has a separate qualification boundary.
 No throughput or general vLLM serving claim is made from these correctness probes.
 
 Streaming CPU cases use the actual mode switch, controller, result-scope fence,

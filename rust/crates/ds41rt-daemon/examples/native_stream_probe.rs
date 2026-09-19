@@ -49,7 +49,7 @@ fn main() -> Result<()> {
         "cancel_ready":args.cancel_ready,"warmup_performed":false}))?;
     let config=TargetConfig{owner:args.owner,snapshot:args.snapshot,native_lib:args.native_lib,
         peers:args.peers.try_into().unwrap(),batch_tokens:args.batch_tokens,
-        max_context_tokens:8192,slots:2,cache_bytes:args.source_pool_budget_bytes};
+        max_context_tokens:8192,slots:2,cache_bytes:args.source_pool_budget_bytes,dspark:None};
     with_target(config,|mut target| {
         let initial=target.bank().info();
         let input=|request|StreamInput{request,tokens:tokens.clone(),chunk_rows:args.chunk_rows,selected:vec![tokens.len()-1]};

@@ -6,10 +6,30 @@ use std::{net::SocketAddr, path::PathBuf};
 #[path = "stream.rs"]
 mod stream;
 pub use stream::{StreamInput, StreamingResult};
+#[path = "draft.rs"]
+mod draft;
+use draft::{NativeDraft, SharedDraft};
 
-/// Explicit target-only construction. vLLM must delegate its physical KV and
-/// backbone weight allocation before invoking this factory. This does not load
-/// dSpark, run a sampler, create a listener, or start the native HTTP scheduler.
+/// Retained greedy draft generation; target sampling remains external.
+#[derive(Clone, Copy, Debug, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct DsparkConfig {
+    pub draft_limit: u8,
+    pub adaptive: bool,
+    pub confidence_cutoff: Option<f64>,
+}
+impl DsparkConfig {
+    pub(super) fn validate(&self) -> Result<()> {
+        ensure!((1..=5).contains(&self.draft_limit), "native draft limit must be 1..5");
+        ensure!(self.confidence_cutoff.is_none_or(|p| p.is_finite() && p>0. && p<=1.), "invalid draft confidence cutoff");
+        ensure!(!(self.adaptive && self.confidence_cutoff.is_some()), "adaptive and confidence-only policies are exclusive");
+        Ok(())
+    }
+}
+
+/// Explicit construction with optional retained dSpark. vLLM must delegate its
+/// physical KV and backbone weight allocation before invoking this factory.
+/// This does not run a sampler, create a listener, or start the HTTP scheduler.
 pub struct TargetConfig {
     /// Nonzero executor-incarnation nonce, never reused across worker restarts.
     pub owner: u64,
@@ -22,6 +42,8 @@ pub struct TargetConfig {
     /// Paired compressed-source payload budget, rounded down to page groups.
     /// Fixed windows and cache metadata are additional; see CacheInfo.cache_bytes.
     pub cache_bytes: usize,
+    /// None retains target-only construction and allocation.
+    pub dspark: Option<DsparkConfig>,
 }
 impl TargetConfig {
     fn args(self) -> Result<crate::cli::NativeServeArgs> {
@@ -29,6 +51,10 @@ impl TargetConfig {
         ensure!((80..=4096).contains(&self.batch_tokens), "invalid target batch capacity");
         ensure!((1..=1048576).contains(&self.max_context_tokens), "invalid target context bound");
         ensure!((1..=16).contains(&self.slots) && self.cache_bytes > 0, "invalid target cache plan");
+        if let Some(draft)=self.dspark {
+            draft.validate()?;
+            ensure!(self.slots >= 2, "native speculative facade requires two draft lanes");
+        }
         use crate::{cli::HostCacheStore, v41_native_serve::memory::{ByteSize, LocalLayers}};
         Ok(crate::cli::NativeServeArgs {
             rtx_gpus: 1, prefill_batch_tokens: self.batch_tokens,
@@ -39,8 +65,11 @@ impl TargetConfig {
             host_cache_store: HostCacheStore::OnRetain, host_cache_copy_budget_ms: 1000,
             host_cache_restore_budget_ms: 500, host_cache_store_pace_ms: 0,
             host_cache_min_tokens: 512, host_cache_max_tokens: self.max_context_tokens,
-            host_cache_kinds: "prompt,turn".into(), dspark: false, dspark_draft_limit: 5,
-            dspark_adaptive: false, dspark_fixed: false, dspark_confidence_cutoff: None,
+            host_cache_kinds: "prompt,turn".into(), dspark: self.dspark.is_some(),
+            dspark_draft_limit: self.dspark.map_or(5,|d|d.draft_limit),
+            dspark_adaptive: self.dspark.is_some_and(|d|d.adaptive),
+            dspark_fixed: self.dspark.is_some_and(|d|!d.adaptive && d.confidence_cutoff.is_none()),
+            dspark_confidence_cutoff: self.dspark.and_then(|d|d.confidence_cutoff),
             dspark_reuse_floor: None, independent_decode_lanes: true,
             snapshot: self.snapshot, native_lib: self.native_lib,
             peers: self.peers.to_vec(), listen: String::new(),
@@ -65,6 +94,7 @@ pub struct NativeBank<'s, 'a> {
     active: Rc<Active>,
     info: CacheInfo,
     max_context: u64,
+    draft: SharedDraft<'s, 'a>,
 }
 impl<'s, 'a> NativeBank<'s, 'a> {
     pub(crate) fn library(&self) -> &'a ds41rt_ffi::NativeLibrary {
@@ -72,15 +102,35 @@ impl<'s, 'a> NativeBank<'s, 'a> {
     }
     pub fn admit(&self, slot: usize, request_id: u64) -> Result<RequestHandle> {
         self.active.healthy()?;
-        self.requests.borrow_mut().admit(slot, request_id)
+        let request=self.requests.borrow_mut().admit(slot,request_id)?;
+        if let Some(draft)=self.draft.borrow_mut().as_deref_mut() {
+            if let Err(error)=draft.admit(request_id) {
+                if self.requests.borrow_mut().release(request).is_err(){self.active.poisoned.set(true);}
+                return Err(error);
+            }
+        }
+        Ok(request)
     }
     pub fn release(&self, request: RequestHandle) -> Result<()> {
         self.active.idle(request)?;
-        self.requests.borrow_mut().release(request)
+        let id=self.requests.borrow().cache().request_id(request)?;
+        let draft=self.draft.borrow_mut().as_deref_mut().map(|draft|draft.release(id)).transpose();
+        let target=self.requests.borrow_mut().release(request);
+        let result=target.and(draft.map(|_|()));
+        if result.is_err(){self.active.poisoned.set(true);}
+        result
     }
     pub fn committed_end(&self, request: RequestHandle) -> Result<u64> {
         self.active.healthy()?;
         self.requests.borrow().cache().committed_end(request)
+    }
+    /// Actual matched three-window frontier; enabled but unseeded windows have
+    /// logical end zero. None means the draft runtime was not constructed.
+    pub fn draft_committed_end(&self, request: RequestHandle) -> Result<Option<u64>> {
+        self.active.healthy()?;
+        let id = self.requests.borrow().cache().request_id(request)?;
+        self.draft.borrow().as_deref().map(|draft| draft.committed_end(id)
+            .map(|end| end.unwrap_or(0))).transpose()
     }
     /// Read-only future append feasibility against the real native page bank.
     /// This does not retain reservations or authorize execution by itself.
@@ -117,6 +167,8 @@ pub struct NativeDriver<'s, 'w, 'a> {
     transport: &'s mut NativeTp4Wave<'a>,
     requests: Rc<RefCell<&'s mut Requests<'a>>>,
     max_context: u64,
+    draft: SharedDraft<'s, 'a>,
+    lane: usize,
 }
 // Safety: all work uses retained native futures and their drain guards; the
 // context prevents publication/reuse until futures and output borrows end.
@@ -129,6 +181,10 @@ unsafe impl TargetDriver for NativeDriver<'_, '_, '_> {
             "target context bound exceeded");
         ensure!(requests.cache().stage(input.request)? == CacheStage::Full,
             "target-only seam does not yet accept encoder/replay work");
+        if let Some(draft)=self.draft.borrow().as_deref() {
+            let id=requests.cache().request_id(input.request)?;
+            draft.validate_position(id,end)?;
+        }
         Ok(())
     }
     fn prepare(&mut self, input: &TargetInput) -> Result<NativeBatch> {
@@ -138,6 +194,7 @@ unsafe impl TargetDriver for NativeDriver<'_, '_, '_> {
         Ok(NativeBatch { batch, request: input.request })
     }
     async fn execute(&mut self, batch: &mut NativeBatch, input: &TargetInput) -> Result<()> {
+        self.pass.set_route_capture(self.draft.borrow().as_deref().is_some_and(NativeDraft::capture_routes));
         unsafe { self.pass.execute_shared(&self.requests, &mut batch.batch,
             self.transport, input.placement, &input.selected).await?; }
         Ok(())
@@ -149,12 +206,16 @@ unsafe impl TargetDriver for NativeDriver<'_, '_, '_> {
     }
     fn commit(&mut self, batch: &mut NativeBatch, accepted: u32) -> Result<u64> {
         let mut requests = self.requests.borrow_mut();
-        self.pass.commit(&mut requests, &mut batch.batch, &[accepted])?;
+        if let Some(draft)=self.draft.borrow_mut().as_deref_mut() {
+            draft.commit(self.pass,&mut requests,&mut batch.batch,accepted,true)?;
+        } else {self.pass.commit(&mut requests,&mut batch.batch,&[accepted])?;}
+        self.pass.set_route_capture(false);
         requests.cache().committed_end(batch.request)
     }
     fn drain(&mut self, batch: &mut NativeBatch) -> Result<()> {
         // Evaluate every drain even if one reports an error. No borrow of the
         // request bank survives transport execution or a CUDA completion wait.
+        self.pass.set_route_capture(false);
         let transport = self.transport.synchronize();
         let commit = self.pass.abort_cache_commit(&mut self.requests.borrow_mut());
         let discard = self.pass.discard(&mut batch.batch);
@@ -242,11 +303,12 @@ pub fn with_target<R>(config: TargetConfig,
         parts.requests.bind_executor_owner(owner)?;
         let owner = parts.requests.cache().owner();
         let requests = Rc::new(RefCell::new(parts.requests));
+        let draft:SharedDraft<'_, '_>=Rc::new(RefCell::new(parts.draft.map(|draft|draft as &mut dyn NativeDraft<'_>)));
         let first = NativeDriver { pass: parts.pass, transport: parts.transport,
-            requests: requests.clone(), max_context: args.max_context_tokens as u64 };
+            requests: requests.clone(), max_context: args.max_context_tokens as u64, draft:draft.clone(),lane:0 };
         let second = NativeDriver { pass: parts.prefill_pass, transport: parts.prefill_transport,
-            requests: requests.clone(), max_context: args.max_context_tokens as u64 };
-        let bank = NativeBank { requests, active: active.clone(), max_context: args.max_context_tokens as u64, info: CacheInfo {
+            requests: requests.clone(), max_context: args.max_context_tokens as u64, draft:draft.clone(),lane:1 };
+        let bank = NativeBank { requests, draft, active: active.clone(), max_context: args.max_context_tokens as u64, info: CacheInfo {
             owner, capacity_rows: parts.capacity, source_page_capacity: parts.source_pages,
             source_pages_free: parts.source_pages,
             source_payload_bytes: parts.source_pages.iter().sum::<usize>() * 256
@@ -266,7 +328,7 @@ mod config_tests {
     fn config() -> TargetConfig {
         TargetConfig { owner: 77, snapshot: "missing-model".into(), native_lib: "missing-library".into(),
             peers: ["127.0.0.1:1".parse().unwrap(); 4], batch_tokens: 1024,
-            max_context_tokens: 8192, slots: 2, cache_bytes: 512 << 20 }
+            max_context_tokens: 8192, slots: 2, cache_bytes: 512 << 20, dspark:None }
     }
     #[test]
     fn explicit_target_factory_never_enables_native_server_or_duplicate_draft() {
@@ -276,6 +338,21 @@ mod config_tests {
         assert_eq!(args.host_cache_bytes, 0);
         assert_eq!(args.rtx_expert_layers, crate::v41_native_serve::memory::LocalLayers::Count(0));
         assert_eq!(args.kv_pool_size.unwrap().0, 512 << 20);
+    }
+    #[test]
+    fn optional_draft_reuses_retained_policy_flags_and_keeps_target_default() {
+        for (adaptive, cutoff) in [(false, None), (true, None), (false, Some(0.6))] {
+            let mut cfg = config();
+            cfg.dspark = Some(DsparkConfig { draft_limit: 3, adaptive, confidence_cutoff: cutoff });
+            let args = cfg.args().unwrap();
+            assert!(args.dspark);
+            assert_eq!(args.dspark_draft_limit, 3);
+            assert_eq!(args.dspark_fixed, !adaptive && cutoff.is_none());
+            assert_eq!(args.dspark_confidence_cutoff, cutoff);
+        }
+        let mut cfg = config();
+        cfg.dspark = Some(DsparkConfig { draft_limit: 5, adaptive: false, confidence_cutoff: Some(f64::NAN) });
+        assert!(cfg.args().is_err());
     }
     #[test]
     fn invalid_geometry_rejected_before_loading_any_native_library() {

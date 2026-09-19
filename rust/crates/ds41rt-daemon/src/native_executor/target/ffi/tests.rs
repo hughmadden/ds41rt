@@ -1,6 +1,7 @@
 //! CPU ABI contract tests use the production channel, registry and lane actors.
 use super::*;
 use crate::v41_compressor::source_cache::{SourcePages, SourcePrefix};
+use crate::v41_dspark_cache::access::{SlotAccess, ReadReservation};
 use std::{
     sync::atomic::{AtomicBool, AtomicUsize},
     time::{Duration, Instant},
@@ -14,6 +15,9 @@ struct Control {
     drains: [AtomicUsize; 2],
     dropped: AtomicUsize,
     stream_stage: AtomicUsize,
+    proposal_ready: [AtomicBool; 2],
+    proposal_readers: [AtomicUsize; 2],
+    proposal_drains: [AtomicUsize; 2],
 }
 impl Control {
     fn new() -> Self {
@@ -25,6 +29,8 @@ impl Control {
             drains: Default::default(),
             dropped: AtomicUsize::new(0),
             stream_stage: AtomicUsize::new(0),
+            proposal_ready: std::array::from_fn(|_| AtomicBool::new(true)),
+            proposal_readers: Default::default(), proposal_drains: Default::default(),
         }
     }
 }
@@ -38,6 +44,7 @@ struct Physical {
 struct FakeBank {
     physical: Rc<RefCell<Physical>>,
     active: Rc<Active>,
+    draft_access: Rc<[SlotAccess; 3]>,
 }
 impl actor::Bank for FakeBank {
     fn info(&self) -> Value {
@@ -57,6 +64,11 @@ impl actor::Bank for FakeBank {
         let p = self.physical.borrow();
         ensure!(r.matches(p.owner, &p.generations), "stale request");
         p.ends[r.slot()].context("released request")
+    }
+    fn draft_end(&self, r: RequestHandle) -> Result<Option<u64>> {
+        // Simulated projection/frontier. Reader ownership is the real native
+        // SlotAccess implementation; physical source pages are SourcePages.
+        self.end(r).map(Some)
     }
     fn can_prepare(&self, work: &[(RequestHandle, u32)]) -> Result<bool> {
         ensure!(!work.is_empty() && work.len() <= 16, "invalid query count");
@@ -97,6 +109,7 @@ impl actor::Bank for FakeBank {
     fn release(&self, r: RequestHandle) -> Result<()> {
         self.active.idle(r)?;
         self.end(r)?;
+        for access in self.draft_access.iter() { access.writable(r.slot())?; }
         let mut p = self.physical.borrow_mut();
         for source in &mut p.pages {
             source.release(r.slot())?;
@@ -116,6 +129,7 @@ struct Driver {
     control: Arc<Control>,
     lane: usize,
     output: Vec<f32>,
+    draft_readers: Option<Vec<ReadReservation>>,
 }
 impl Drop for Driver {
     fn drop(&mut self) {
@@ -199,6 +213,31 @@ unsafe impl TargetDriver for Driver {
         Ok(())
     }
 }
+unsafe impl SpeculativeDriver for Driver {
+    fn validate_proposal(&self, input: &SpeculativeInput) -> Result<()> {
+        let end = actor::Bank::end(&self.bank, input.request)?;
+        ensure!(end > 0 && end == input.expected_committed_end, "invalid speculative frontier");
+        Ok(())
+    }
+    fn poll_proposal(&mut self, input: &SpeculativeInput) -> Result<Option<DraftTokens>> {
+        if self.draft_readers.is_none() {
+            let mask = std::array::from_fn(|i| i == input.request.slot());
+            self.draft_readers = Some(self.bank.draft_access.iter().map(|a|a.reserve(mask)).collect::<Result<Vec<_>>>()?);
+            self.control.proposal_readers[self.lane].store(3, Ordering::SeqCst);
+        }
+        if !self.control.proposal_ready[self.lane].load(Ordering::SeqCst) { return Ok(None); }
+        self.draft_readers = None;
+        self.control.proposal_readers[self.lane].store(0, Ordering::SeqCst);
+        Ok(Some(DraftTokens { tokens: (0..input.remaining_output_tokens.min(4))
+            .map(|i|input.anchor + i as u32).collect(), draft_us: 11 }))
+    }
+    fn cancel_proposal(&mut self) -> Result<()> {
+        self.draft_readers = None;
+        self.control.proposal_readers[self.lane].store(0, Ordering::SeqCst);
+        self.control.proposal_drains[self.lane].fetch_add(1, Ordering::SeqCst);
+        Ok(())
+    }
+}
 struct FakeFence {
     control: Arc<Control>,
     lane: usize,
@@ -234,6 +273,7 @@ fn fixture() -> Fixture {
                     generations: [0; 2],
                 })),
                 active: active.clone(),
+                draft_access: Rc::new(std::array::from_fn(|_| SlotAccess::default())),
             };
             let mut contexts = std::array::from_fn::<_, 2, _>(|lane| {
                 TargetContext::new(
@@ -241,7 +281,7 @@ fn fixture() -> Fixture {
                         bank: bank.clone(),
                         control: signals.clone(),
                         lane,
-                        output: vec![],
+                        output: vec![], draft_readers: None,
                     },
                     active.clone(),
                     lane,
@@ -1035,3 +1075,6 @@ fn invalid_stream_input_preserves_fresh_admission_and_normal_mode_reentry() {
     );
     close(f);
 }
+
+#[path = "proposal_tests.rs"]
+mod proposal_tests;

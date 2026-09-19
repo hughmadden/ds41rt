@@ -76,7 +76,7 @@ fn main() -> Result<()> {
     let config = TargetConfig { owner: args.owner, snapshot: args.snapshot,
         native_lib: args.native_lib, peers: args.peers.try_into().unwrap(),
         batch_tokens: args.batch_tokens, max_context_tokens: args.max_context_tokens,
-        slots: 2, cache_bytes: args.cache_bytes };
+        slots: 2, dspark: None, cache_bytes: args.cache_bytes };
     with_target(config, |mut target| {
         let initial = target.bank().info();
         emit(json!({"event":"initialized", "startup_ms":startup.elapsed().as_secs_f64()*1000.0,

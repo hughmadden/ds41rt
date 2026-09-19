@@ -9,7 +9,9 @@ use std::{cell::{Cell, RefCell}, rc::Rc};
 
 mod native;
 mod ffi;
-pub use native::{with_target, NativeBank, NativeDriver, NativeTarget, TargetConfig, CacheInfo};
+mod speculative;
+pub use speculative::{SpeculativeInput, SpeculativeProposal, DraftTokens, SpeculativeDriver};
+pub use native::{with_target, NativeBank, NativeDriver, NativeTarget, TargetConfig, CacheInfo, DsparkConfig};
 pub use native::{StreamInput, StreamingResult};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
@@ -23,6 +25,17 @@ pub struct TargetInput {
     pub selected: Vec<usize>,
     pub kind: SourceKind,
     pub placement: u64,
+}
+
+impl TargetInput {
+    fn validate(&self, capacity: usize, head_capacity: usize) -> Result<()> {
+        ensure!(!self.tokens.is_empty() && self.tokens.len() <= capacity, "invalid target row count");
+        ensure!(self.tokens.iter().all(|&token| token < 129280), "target token ID exceeds vocabulary");
+        ensure!(!self.selected.is_empty() && self.selected.len() <= head_capacity
+            && self.selected.iter().all(|&row| row < self.tokens.len()), "invalid selected logits rows");
+        ensure!(self.selected.windows(2).all(|w| w[0] < w[1]), "selected logits rows must increase");
+        Ok(())
+    }
 }
 
 /// Selected FP32 vocabulary rows. The device descriptor is deliberately unsafe
@@ -117,11 +130,7 @@ impl<D: TargetDriver> TargetContext<D> {
     pub fn submit(&mut self, input: TargetInput) -> Result<Ticket> {
         self.active.healthy()?;
         ensure!(self.job.is_none(), "target lane busy");
-        ensure!(!input.tokens.is_empty() && input.tokens.len() <= self.capacity, "invalid target row count");
-        ensure!(input.tokens.iter().all(|&token| token < 129280), "target token ID exceeds vocabulary");
-        ensure!(!input.selected.is_empty() && input.selected.len() <= self.head_capacity
-            && input.selected.iter().all(|&row| row < input.tokens.len()), "invalid selected logits rows");
-        ensure!(input.selected.windows(2).all(|w| w[0] < w[1]), "selected logits rows must increase");
+        input.validate(self.capacity,self.head_capacity)?;
         self.driver.validate(&input)?;
         let ticket = self.active.claim(input.request, self.lane)?;
         let batch = match self.driver.prepare(&input) {

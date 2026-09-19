@@ -474,10 +474,17 @@ impl DsparkChain<'_, '_> {
             .map(|b| f32::from_ne_bytes(b.try_into().unwrap())).collect();
         Ok(Some((tokens, confidence)))
     }
+    /// Preserve reader ownership until the actual producer stream has drained.
+    pub(crate) fn cancel_pending(&mut self) -> Result<()> {
+        self.synchronize()?;
+        if let Some(pending) = &mut self.pending { pending.armed = false; }
+        self.pending = None;
+        self.invalidate();
+        Ok(())
+    }
     #[cfg(test)]
     pub fn cancel_pending_for_test(&mut self) {
-        self.pending = None; // guard drains before releasing reads
-        self.invalidate();
+        self.cancel_pending().expect("draining test draft");
     }
     pub fn output(&self) -> Result<[Ds41rtDeviceBuffer; 2]> {
         let requests = self.ready.context("dSpark chain output incomplete")?;
