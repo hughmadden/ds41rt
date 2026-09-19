@@ -15,6 +15,32 @@ pub struct V41Fp8PlanInfo {
 pub struct V41Fp8Plan<'a> {
     info: V41Fp8PlanInfo,
     kernels: Vec<(V41Fp8Kernel<'a>, usize)>,
+    diagnostic_wob_m1_cap16: bool,
+}
+
+const WOB_PROBE_ENV: &str = "DS41RT_DIAGNOSTIC_WOB_M1_CAP16";
+
+fn diagnostic_wob_m1_cap16(value: Option<&std::ffi::OsStr>) -> Result<bool> {
+    match value {
+        None => Ok(false),
+        Some(value) => {
+            ensure!(value == "0" || value == "1", "{WOB_PROBE_ENV} must be 0 or 1");
+            Ok(value == "1")
+        }
+    }
+}
+
+fn select_index(info: V41Fp8PlanInfo, rows: u32, diagnostic: bool,
+    mut capacities: impl Iterator<Item = u32>) -> Result<usize> {
+    ensure!(rows > 0 && rows <= info.capacity_rows, "FP8 rows exceed planned capacity");
+    if diagnostic && rows == 1 && info.input_dim == 8192 && info.output_dim == 5120 {
+        // Select only an already-loaded exact capacity. Never widen live row
+        // bounds or borrow a larger scratch layout under the diagnostic flag.
+        capacities.position(|capacity| capacity == 16)
+            .context("WO-B M1 diagnostic requires an existing capacity16 kernel")
+    } else {
+        capacities.position(|capacity| rows <= capacity).context("FP8 capacity plan missing")
+    }
 }
 
 fn capacities(capacity: u32) -> Result<Vec<u32>> {
@@ -79,7 +105,16 @@ impl NativeLibrary {
         Ok(info)
     }
     pub fn v41_fp8_matrix_plan(&self, capacity: u32, k: u32, n: u32) -> Result<V41Fp8Plan<'_>> {
-        let kernels = capacities(capacity)?
+        // Capture the flag once, before graph capture. Normal serving never
+        // reads the environment on launch or changes a captured graph's recipe.
+        let diagnostic_wob_m1_cap16 = diagnostic_wob_m1_cap16(
+            std::env::var_os(WOB_PROBE_ENV).as_deref())?;
+        let planned = capacities(capacity)?;
+        if diagnostic_wob_m1_cap16 && k == 8192 && n == 5120 {
+            ensure!(planned.contains(&16),
+                "WO-B M1 diagnostic requires an existing capacity16 kernel");
+        }
+        let kernels = planned
             .into_iter()
             .map(|rows| self.v41_fp8_matrix_kernel(rows, k, n))
             .collect::<Result<Vec<_>>>()?;
@@ -89,6 +124,7 @@ impl NativeLibrary {
         Ok(V41Fp8Plan {
             info,
             kernels: kernels.into_iter().zip(offsets).collect(),
+            diagnostic_wob_m1_cap16,
         })
     }
 }
@@ -99,14 +135,9 @@ impl V41Fp8Plan<'_> {
     }
 
     fn select(&self, rows: u32) -> Result<&(V41Fp8Kernel<'_>, usize)> {
-        ensure!(
-            rows > 0 && rows <= self.info.capacity_rows,
-            "FP8 rows exceed planned capacity"
-        );
-        self.kernels
-            .iter()
-            .find(|(kernel, _)| rows <= kernel.info().capacity_rows)
-            .context("FP8 capacity plan missing")
+        let index = select_index(self.info, rows, self.diagnostic_wob_m1_cap16,
+            self.kernels.iter().map(|(kernel, _)| kernel.info().capacity_rows))?;
+        Ok(&self.kernels[index])
     }
 
     fn scratch_slice(
@@ -209,6 +240,55 @@ impl V41Fp8Plan<'_> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn selection_info(capacity_rows: u32, input_dim: u32, output_dim: u32) -> V41Fp8PlanInfo {
+        V41Fp8PlanInfo { capacity_rows, input_dim, output_dim,
+            scratch_bytes: 4096, packed_weight_scale_bytes: 1024 }
+    }
+
+    #[test]
+    fn wob_probe_requires_explicit_flag() {
+        assert!(!diagnostic_wob_m1_cap16(None).unwrap());
+        assert!(!diagnostic_wob_m1_cap16(Some(std::ffi::OsStr::new("0"))).unwrap());
+        assert!(diagnostic_wob_m1_cap16(Some(std::ffi::OsStr::new("1"))).unwrap());
+        for value in ["", "true", "16", " 1"] {
+            assert!(diagnostic_wob_m1_cap16(Some(std::ffi::OsStr::new(value))).is_err());
+        }
+    }
+
+    #[test]
+    fn wob_probe_changes_only_single_row_wob() {
+        let caps = [1, 16, 80, 1024];
+        let info = selection_info(1024, 8192, 5120);
+        assert_eq!(select_index(info, 1, false, caps.into_iter()).unwrap(), 0);
+        assert_eq!(select_index(info, 1, true, caps.into_iter()).unwrap(), 1);
+        for rows in [2, 4, 16, 17, 80, 81, 1024] {
+            assert_eq!(select_index(info, rows, false, caps.into_iter()).unwrap(),
+                select_index(info, rows, true, caps.into_iter()).unwrap());
+        }
+        for (k, n) in [(8192, 512), (5120, 8192), (15360, 5120), (8192, 5121)] {
+            assert_eq!(select_index(selection_info(1024, k, n), 1, true,
+                caps.into_iter()).unwrap(), 0);
+        }
+    }
+
+    #[test]
+    fn wob_probe_preserves_live_bounds_and_requires_existing_exact_capacity() {
+        let info = selection_info(4, 8192, 5120);
+        for enabled in [false, true] {
+            for rows in [0, 5, 16] {
+                assert!(select_index(info, rows, enabled, [1, 16].into_iter()).is_err());
+            }
+        }
+        assert_eq!(select_index(info, 1, true, [1, 16].into_iter()).unwrap(), 1);
+        for caps in [vec![], vec![1], vec![1, 80], vec![1, 1024]] {
+            assert!(select_index(info, 1, true, caps.into_iter()).is_err());
+        }
+        assert!(select_index(info, 4, false, [1].into_iter()).is_err());
+        assert!(select_index(selection_info(1, 8192, 5120), 1, true,
+            capacities(1).unwrap().into_iter()).is_err());
+    }
+
     #[test]
     fn scratch_slices_preserve_alignment_and_large_offsets() {
         let infos: Vec<_> = [1, 16, 80, 4096]
